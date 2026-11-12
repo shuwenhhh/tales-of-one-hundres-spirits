@@ -1,0 +1,19 @@
+# Godot 4+ specific ignores
+.godot/
+/android/
+# Local backups and review renders
+*.bak
+/preview*.png
+/preview*.png.import
+/art_review/
+
+# Generated files and local exports.
+__pycache__/
+*.py[cod]
+/build/
+/builds/
+/exports/
+export_credentials.cfg
+.env
+.env.*
+!.env.example

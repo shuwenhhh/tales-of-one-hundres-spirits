@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/characters/girl_idle.png" id="1_girl"]
+
+[node name="Girl" type="Node2D"]
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+position = Vector2(0, -96)
+scale = Vector2(0.125, 0.125)
+texture = ExtResource("1_girl")

@@ -1,0 +1,39 @@
+Girl walk v2, approved-direction redraw, 2026-11-11.
+
+Generation: built-in ImageGen tool, one eight-frame strip in one request.
+References: the user's approved umbrella-walk preview, plus shipped pose_0.png.
+Raw generation: assets/characters/source/girl_walk_v2_raw.png
+Final frames: assets/chapter1/pixel/girl/walk_v2/walk_00.png .. walk_07.png
+Frame data: manifest.json in this folder.
+Preview sheet: art_review/walk_v2/walk_strip.png
+Loop preview: art_review/walk_v2/walk_loop.gif
+In-game screenshots: art_review/walking/
+
+Prompt specification:
+Preserve the approved little girl's short dark-navy bob haircut, brown eye,
+ivory blouse, blue bow, teal-blue vest, navy pleated skirt, cropped dark leggings,
+cream socks and brown Mary Jane shoes. Fine pixel-art style, muted palette,
+dark-navy outlines, stable head/body proportions, all figures facing right.
+One horizontal transparent strip of exactly eight full-body frames, equally
+spaced, no scenery, floor, shadow, labels or numbers. Draw the complete child
+walk cycle: near heel contact, near-leg compression, far-leg passing, far-leg
+reach, far heel contact, far-leg compression, near-leg passing, near-leg reach.
+At least one foot remains on the shared baseline throughout. Far leg slightly
+darker, modest skirt/hair movement, no running, floating or changing scale.
+Keep the near gripping hand steady at hip height and leave it empty: the closed
+blue umbrella remains a separate runtime prop, never painted into these frames.
+
+Normalization: tools/normalize_girl_walk.py, one shared source scale and palette,
+hard alpha, 1px navy outline, 64x80 canvas, bottom-center sole anchor (32,72).
+Head-region centers stabilize horizontal placement; each planted sole is aligned
+without independently scaling frames. Near-hand coordinates are stored per frame.
+The sprite-pipeline skill's external helper scripts were absent; the project-local
+normalizer reuses tools/pixelize_sprites.py's conversion functions instead.
+
+Integration: scripts/hero_walk.gd draws full frames at original game scale.
+Distance drives both the eight-frame cycle and the approved alternating footsteps.
+Both chapters mirror body and independent umbrella together. Idle/jump/attack art
+is preserved. The earlier procedural split-leg deformation is no longer used.
+
+Verification: eight distinct frames, uniform anchors, both directions in both
+chapters, stop/airborne/pause sound behavior, and existing umbrella attack tests.

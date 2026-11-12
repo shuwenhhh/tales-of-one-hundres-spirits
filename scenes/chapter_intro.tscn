@@ -1,0 +1,92 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/chapter_intro.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/chapter1/chapter_title_en.png" id="2"]
+[ext_resource type="FontFile" path="res://assets/chapter1/chinese.ttc" id="3"]
+
+[node name="ChapterIntro" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0.015, 0.035, 0.07, 1)
+
+[node name="Cover" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+texture = ExtResource("2")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="ChapterLabel" type="Label" parent="."]
+layout_mode = 1
+anchor_left = 0.70
+anchor_top = 0.17
+anchor_right = 0.96
+anchor_bottom = 0.23
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.93, 0.88, 0.76, 1)
+theme_override_colors/font_shadow_color = Color(0.02, 0.04, 0.08, 0.9)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_fonts/font = ExtResource("3")
+theme_override_font_sizes/font_size = 17
+text = "CHAPTER ONE"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="EnglishTitle" type="Label" parent="."]
+layout_mode = 1
+anchor_left = 0.68
+anchor_top = 0.24
+anchor_right = 0.97
+anchor_bottom = 0.65
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.96, 0.90, 0.79, 1)
+theme_override_colors/font_shadow_color = Color(0.02, 0.04, 0.08, 0.95)
+theme_override_constants/shadow_offset_x = 3
+theme_override_constants/shadow_offset_y = 3
+theme_override_constants/line_spacing = 7
+theme_override_fonts/font = ExtResource("3")
+theme_override_font_sizes/font_size = 42
+text = "ENDLESS\nTHREADS"
+horizontal_alignment = 1
+vertical_alignment = 1
+[node name="Prompt" type="Label" parent="."]
+modulate = Color(1, 1, 1, 0)
+layout_mode = 1
+anchor_left = 0.15
+anchor_top = 0.91
+anchor_right = 0.85
+anchor_bottom = 0.97
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.86, 0.89, 0.85, 1)
+theme_override_colors/font_shadow_color = Color(0.02, 0.04, 0.07, 1)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+theme_override_fonts/font = ExtResource("3")
+theme_override_font_sizes/font_size = 15
+text = "CLICK / SPACE / ENTER  ·  BEGIN STORY"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Veil" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0.015, 0.035, 0.07, 1)

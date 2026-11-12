@@ -1,0 +1,7 @@
+Handdrawn heroine replacement — 2026-10-19
+Source: built-in image generation, approved preview exec-2712e757-ba81-46b3-a414-05aa70650115.png.
+Prompt: preserve approved short-haired girl, cream blouse/teal vest/navy skirt; six right-facing empty-handed poses, smooth nonpixel outlines, transparent background; separate closed blue umbrella, wooden hook, no clouds or effects.
+Pose order: idle, walk A, walk B, jump/dash, horizontal strike, upward strike.
+Alpha: largest opaque connected components extracted; six poses share 65/442 scale in game. Linear filtering. Procedural swing arc/contact spark drawn independently. These are key poses, not a full inbetween animation set.
+Umbrella: separate PNG, initially equipped, toggle with 1. J horizontal attack; hold W/up + J upward. Facing is locked for each attack. Airborne boss can be hit after releasing silk, once per opening.
+Old pixel assets retained on disk for rollback but no longer loaded by chapter1.gd.

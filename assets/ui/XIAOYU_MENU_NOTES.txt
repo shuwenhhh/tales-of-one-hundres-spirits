@@ -1,0 +1,19 @@
+Approved Xiaoyu umbrella main menu, 2026-11-11.
+
+Active background: assets/ui/xiaoyu_umbrella_menu_v1.png
+Built-in ImageGen edit of the user's selected diagonal-print concept.
+Characters: only Xiaoyu. Large vermilion/navy umbrella, landscape print panels,
+moonlit mountains, lantern village, peach blossoms and navy/ivory wave motifs.
+The left area is dark navy, with all title/menu text removed from the bitmap.
+The previous fox_spirit_menu.png is retained as an earlier version.
+
+Edit prompt:
+Remove all title text, five menu labels and gold selection mark from the left
+column; restore matching uninterrupted indigo textured paper. Preserve Xiaoyu's
+face, hairstyle and clothing, the umbrella, landscape-panel collage, cream waves,
+blossoms, corner and cloud ornaments, paper texture, palette and 16:9 framing.
+No new lettering, symbols, logos, crop or change to the girl's pose.
+
+scripts/main_menu.gd draws the real three-line title and interactive menu.
+Selected menu entries use gold text and a four-diamond marker; typography remains
+separate from art so mouse/keyboard focus and all existing menu actions work.

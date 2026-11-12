@@ -1,0 +1,8 @@
+Source: built-in imagegen, based on the user-approved simplified grandmother design.
+Six poses: pose_0 idle, pose_1 ground cast, pose_2 airborne spread,
+pose_3 cloak wrap, pose_4 dash/dive, pose_5 landing.
+Transparent silhouettes extracted from the generated sheet by connected components
+at alpha >= 0.92 to exclude generated background glow. Shared runtime scale 0.32.
+These are six key poses with procedural movement, not a full frame-by-frame animation
+or a Skeleton2D rig. Silk is drawn independently as three interwoven curves with
+its own length, velocity, lifetime and swept collision.

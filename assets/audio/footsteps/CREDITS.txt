@@ -1,0 +1,16 @@
+Child walking excitedly- Foley
+Author: Wigglesworth
+Source: https://freesound.org/people/Wigglesworth/sounds/850275/
+License on source page: Creative Commons 0 (CC0 1.0)
+License: https://creativecommons.org/publicdomain/zero/1.0/
+Retrieved: 2026-11-10
+
+The public HQ MP3 preview was downloaded from the source page:
+https://cdn.freesound.org/previews/850/850275_6775466-hq.mp3
+
+Adaptation: four 170 ms mono contacts, trimmed from the recording, DC offset
+removed, peak-normalized and given short fades. Runtime playback alternates
+the samples with small pitch/volume variations, triggered by grounded steps.
+No looping of the original walk recording.
+
+Rebuild: run tools/decode_footsteps.gd with Godot, then tools/prepare_footsteps.py.

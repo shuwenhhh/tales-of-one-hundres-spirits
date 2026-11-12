@@ -1,0 +1,17 @@
+第二章桃花妖与庭院，2026-11-10。
+
+背景：早期版本 peach_garden_pixel_v1.png 使用内置 image_gen 生成。用户从三张新候选中选定 C；现使用 background_candidates/peach_orchard_c_960x540.png。新版保留远山、月色和像素石路，补上树下石凳与旧书、半掩竹编园门；空中没有花瓣。新图提示词见 background_candidates/GENERATION_NOTES.md，早期图提示词见 art_review/chapter2/peach-garden-generation-v1.json。
+
+角色 peach-spirit-idle.png：以用户选定的银紫盘发、月白宽袖桃花妖为基础重新生成，保留三朵簪花、粉裙、绿腰带和长桃木枝，减少衣褶与配饰细节。游戏内站姿高度提高至148像素，使用最近邻采样。
+
+战斗：脚本 scripts/chapter2.gd。对话结束后进入1.2秒开场保护并后撤到安全距离；桃花妖随后追近小雨，用桃枝横扫、突刺、腾跃下击。第二阶段由抬杖姿势召唤间歇花雨，花瓣从左侧树冠飘下；花瓣碰到小雨仅定住1秒，不扣心力。召唤后桃花妖继续战斗，落花是独立碰撞对象。
+
+peach-spirit-windup.png 与 peach-spirit-swing.png：配合简化待机图重新生成。蓄力时抬起真正的桃木枝，挥击时俯身把枝条压低到小雨胸前；挥击姿势的画布高度116像素，人物头部与站姿保持近似大小。三张图已截取游戏画面检查脚底和枝条位置。
+
+桃枝攻击修订：脚本中移除单独绘制的攻击直线；攻击由手持桃木枝的角色姿势表现。突刺前在杖尖出现短暂闪光并播放现有蓄力音效，玩家能从举杖姿势辨认方向。花瓣命中只定身1秒。
+
+决斗节奏修订（2026-11-11）：以快速贴身决斗的节奏为灵感，新增 peach-spirit-lunge.png 与 peach-spirit-leap.png 两张原创姿势。普通阶段交替使用低位横扫和持枝突刺；执念减半后加入腾跃下击，加快接近、前摇与收招。突刺和下击有各自的动作图与接触范围，桃木枝始终由角色握持，没有独立直线特效。生成记录见 art_review/chapter2/peach_spirit/duel-pose-generation.md。
+
+现行 Boss 调整（2026-11-11）：突刺蓄力0.5秒、预警提前0.15秒、收招0.5秒；这些蓄力与收招值可在 Godot 检视器调整。玩家贴身接触扣1心并击退，受伤无敌1秒、精灵闪烁；Shift 可以穿过桃花妖。1.5秒内连续三击触发随机后跳或招架反击，反应冷却3秒；被逼到墙角时跳过小雨换边。新增 peach-spirit-cast.png，生成提示词见 art_review/chapter2/peach_spirit/blossom-cast-generation.md。
+
+验证：运行 Godot --headless --path . --script res://scripts/verify_chapter2.gd 检查开场、突刺提示、身体接触、冲刺穿越、连击反应、墙角换边、召花与结尾。实际游戏截图位于 art_review/chapter2/peach_branch_*.png 和 peach_blossom_cast.png。

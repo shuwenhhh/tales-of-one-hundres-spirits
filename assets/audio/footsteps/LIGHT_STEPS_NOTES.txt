@@ -1,0 +1,8 @@
+Active footsteps: light_step_1.wav and light_step_2.wav
+Original procedural synthesis, approved 2026-11-10.
+Exact first two contacts from art_review/audio/generated_walk/04_airy_light_steps.wav.
+No Freesound recording is used in these two samples.
+Rebuild with tools/synthesize_light_walk.py.
+
+Runtime: alternate 1, 2 at each grounded half-stride. Preserve sample level,
+no random pitch or gain. Stop immediately when movement stops or is suspended.

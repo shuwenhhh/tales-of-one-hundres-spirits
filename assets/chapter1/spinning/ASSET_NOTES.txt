@@ -1,0 +1,7 @@
+Spinning opening added 2026-10-31.
+Approved reference: granny-spin-01.png, selected by user.
+worker.png and frame.png: built-in image_gen edits of the approved reference, transparent RGBA 1374x1145. Runtime art retains the navy hood, white hair and lavender lining.
+Animation: layered procedural animation; six wheel spokes rotate independently, worker mesh subtly moves hands and upper body. Silk is drawn between spindle and hand. Standing uses anticipation deformation and a discrete change to the existing upright pose (not a full hand-drawn frame strip).
+Props remain at fixed world position in dialogue, battle, retry and peace. No collision or combat damage attached to props.
+Flow: explore/working -> approach within 160px while grounded -> seated opening dialogue -> 1.1s rise after second line -> remaining dialogue -> battle. Opening trigger is one-shot per chapter scene instance.
+Validated with rendered Godot 4.7.2 screenshots and scripted walk input; pause, input lock during rise, continuation line, battle entry and retry passed. Existing impact regression: 0 failures. PNG alpha inspected.
