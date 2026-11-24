@@ -19,6 +19,7 @@ var memories_panel
 var modal_page: String = ""
 var story_return: String = "memories"
 var chapter_gallery
+var memory_selection_scene: String = ""
 
 func _ready() -> void:
 	JOURNEY.apply_preferences()
@@ -139,8 +140,14 @@ func _build_modal() -> void:
 	overlay.hide()
 
 func _open_modal(title: String) -> void:
+	overlay.color = Color(0.02, 0.035, 0.065, 0.88)
 	if not overlay.visible:
 		last_focus = get_viewport().gui_get_focus_owner()
+	if is_instance_valid(memories_panel):
+		memories_panel.get_parent().remove_child(memories_panel)
+		memories_panel.queue_free()
+		memories_panel = null
+	modal.show()
 	modal_page = ""
 	modal.anchor_left = .16
 	modal.anchor_right = .84
@@ -174,24 +181,32 @@ func _add_close() -> void:
 	close.grab_focus()
 
 func _close_modal() -> void:
+	if modal_page == "memories" and is_instance_valid(memories_panel):
+		memories_panel.close_scroll()
+		return
+	_finish_close_modal()
+
+func _finish_close_modal() -> void:
 	overlay.hide()
+	if is_instance_valid(memories_panel):
+		memories_panel.queue_free()
+		memories_panel = null
 	for button in buttons:
 		button.focus_mode = Control.FOCUS_NONE if button.disabled else Control.FOCUS_ALL
 	if is_instance_valid(last_focus):
 		last_focus.grab_focus()
 
 func _show_memories() -> void:
-	_open_modal("Memories")
+	_open_modal("")
 	modal_page = "memories"
-	modal.anchor_left = .07
-	modal.anchor_right = .93
-	modal.anchor_top = .06
-	modal.anchor_bottom = .94
+	modal.hide()
+	# Leave the area outside the handscroll empty, without the menu illustration.
+	overlay.color = Color.BLACK
 	memories_panel = preload("res://scripts/memories_panel.gd").new()
-	modal_content.add_child(memories_panel)
-	memories_panel.story_requested.connect(_read_friend_story)
-	memories_panel.replay_requested.connect(_go_to)
-	_add_close()
+	memories_panel.initial_selection = memory_selection_scene
+	memories_panel.selection_changed.connect(func(scene: String) -> void: memory_selection_scene = scene)
+	overlay.add_child(memories_panel)
+	memories_panel.close_requested.connect(_finish_close_modal)
 
 func _read_friend_story(scene: String) -> void:
 	if scene not in JOURNEY.completed_chapters():
@@ -269,7 +284,9 @@ func _go_to(scene: String) -> void:
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_ESCAPE and overlay.visible:
-		if modal_page == "story":
+		if modal_page == "memories" and is_instance_valid(memories_panel) and memories_panel.story_visible:
+			memories_panel.show_parade()
+		elif modal_page == "story":
 			_return_from_story()
 		else:
 			_close_modal()

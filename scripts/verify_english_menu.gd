@@ -63,9 +63,11 @@ func run() -> void:
 	await shot("01_main_menu")
 	menu.buttons[2].pressed.emit()
 	await process_frame
-	check(menu.overlay.visible and menu.memories_panel.cards.size() == 3 and not menu.memories_panel.cards[0].get_meta("known"), "Memories opens with locked friend cards")
+	check(menu.overlay.visible and menu.memories_panel.cards.size() == menu.FRIENDS.ENTRIES.size() and not menu.memories_panel.cards[0].get_meta("completed"), "Memories opens with locked spirit silhouettes")
+	await create_timer(1.9).timeout
 	await shot("02_memories")
 	menu._close_modal()
+	await create_timer(.85).timeout
 	check(root.gui_get_focus_owner() == menu.buttons[2], "closing a panel restores menu focus")
 	menu.buttons[3].pressed.emit()
 	await process_frame

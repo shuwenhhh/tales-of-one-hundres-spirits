@@ -29,7 +29,7 @@ Enter a moonlit bamboo grove and meet Qingyan. Time umbrella strikes to reflect 
 ## Stories worth returning to
 
 - **Continue Journey** opens a chapter gallery. The next chapter is highlighted, completed chapters can be replayed, and later encounters remain hidden.
-- **Memories** records the spirit friends you have met. Completing an encounter unlocks its story and recorded conversations where available.
+- **Memories** opens a single illustrated handscroll against empty black space, without an external title, counters or description bar. It unrolls over 1.8 seconds; completed chapters reveal full-color portraits and unfinished spirits remain ink silhouettes. Click a spirit (or choose with Left/Right and press Enter) to read its complete story directly on the same scroll, in an antique serif font. Back/Esc returns to the parade; Close/Esc from the parade rolls it up. Reading never changes progress. Chapter replay remains available through Continue Journey.
 - Progress is saved on victory. Reading or replaying an earlier chapter keeps your furthest progress.
 - Rain continues through dialogue and combat, with layered scenery, animated footsteps, and umbrella impact sounds.
 - Settings include mute, fullscreen, and reduced screen shake.
@@ -114,5 +114,7 @@ godot --headless --path . --script res://scripts/verify_english_menu.gd
 ```
 
 Run without `--headless` when you need visual captures. Test captures are written to the ignored `art_review/` directory.
+
+For the animated Memories scroll, use a separate PowerShell process with `APPDATA` and `LOCALAPPDATA` under `.godot/scroll_test/`, set `TALES_TEST_RUN=1`, then run `godot --headless --path . --script res://scripts/verify_memory_scroll.gd`. This runner checks unfolding, closing mid-animation, mouse and keyboard selection, completion-gated silhouettes, recorded stories, focus restoration and save preservation. A rendered run also captures mixed progress, all revealed portraits and window resizing in `art_review/memory_scroll/`.
 
 Asset preparation and generation notes are kept alongside their corresponding files under `assets/`. This repository does not currently declare a redistribution license.
