@@ -70,7 +70,7 @@ func _ready() -> void:
 			hidden.modulate = Color("747b90")
 			artwork.add_child(hidden)
 			hidden.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		caption(column, "CHAPTER %02d" % [index + 1], 12, Color("a8adbc"))
+		caption(column, "CHAPTER %02d" % [index], 12, Color("a8adbc"))
 		caption(column, entry.get("chapter_title", entry.chapter) if known else "???", 14, Color("eee1c9"))
 		caption(column, "Continue here" if current else ("Completed" if complete else "Not reached"), 13, Color("e7c37b") if current else Color("9da3b2"))
 		if current:

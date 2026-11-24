@@ -230,7 +230,7 @@ func _show_settings() -> void:
 	_add_close()
 
 func _begin_story() -> void:
-	_go_to("res://scenes/chapter_intro.tscn")
+	_go_to("res://chapter0.tscn")
 
 func _continue_journey() -> void:
 	_show_chapters()

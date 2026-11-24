@@ -3,6 +3,14 @@ extends RefCounted
 # Append future friends here; use chapter scene paths as stable progress keys.
 const ENTRIES := [
 	{
+		"scene": "res://chapter0.tscn", "name": "Umbrella Spirit", "chapter": "A FOUND UMBRELLA",
+		"background": preload("res://assets/chapter0/concepts/old_manor_road_moonlit_v3.png"),
+		"portrait": preload("res://assets/chapter0/encounter/spirit.png"), "role": "An old blue umbrella",
+		"intro": "Something is knocking inside a trunk outside the shuttered manor.",
+		"summary": "Ten raindrops brought back an old familiar sound.",
+		"story": "Left in a trunk when the household moved away, the blue umbrella longed to feel rain again. Xiaoyu caught ten drops. Even on sunny days, they would travel together."
+	},
+	{
 		"scene": "res://chapter1.tscn", "name": "Grandmother", "chapter": "SPRING UNSEEN",
 		"chapter_title": "ENDLESS THREADS",
 		"background": preload("res://assets/chapter1/backgrounds/rain_town_pixel_v1.png"),

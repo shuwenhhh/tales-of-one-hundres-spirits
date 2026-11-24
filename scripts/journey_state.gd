@@ -5,8 +5,10 @@ const SETTINGS := "user://settings.cfg"
 const SAVE_VERSION := 2
 const CHAPTERS: Array[String] = ["res://chapter1.tscn", "res://chapter2.tscn", "res://chapter3.tscn"]
 
+const ORDER: Array[String] = ["res://chapter0.tscn", "res://chapter1.tscn", "res://chapter2.tscn", "res://chapter3.tscn"]
+
 static func remember_chapter(scene: String) -> void:
-	if scene not in CHAPTERS:
+	if scene not in ORDER:
 		return
 	var cfg := load_progress()
 	cfg.set_value("journey", "chapter", scene)
@@ -23,11 +25,11 @@ static func continue_scene() -> String:
 	if not cleared.is_empty():
 		var furthest := -1
 		for scene in cleared:
-			furthest = maxi(furthest, CHAPTERS.find(scene))
-		return CHAPTERS[furthest + 1] if furthest + 1 < CHAPTERS.size() else ""
+			furthest = maxi(furthest, ORDER.find(scene))
+		return ORDER[furthest + 1] if furthest + 1 < ORDER.size() else ""
 	# Preserve chapter checkpoints from saves that did not yet track victories.
 	var scene := str(load_progress().get_value("journey", "chapter", ""))
-	if scene in CHAPTERS:
+	if scene in ORDER:
 		return scene
 	return ""
 
@@ -58,7 +60,7 @@ static func scene_list(value: Variant) -> Array[String]:
 	var result: Array[String] = []
 	if value is Array or value is PackedStringArray:
 		for entry in value:
-			if entry is String and entry in CHAPTERS and entry not in result:
+			if entry is String and entry in ORDER and entry not in result:
 				result.append(entry)
 	return result
 
@@ -79,10 +81,10 @@ static func has_met(scene: String) -> bool:
 	return scene in completed_chapters() or scene in scene_list(load_progress().get_value("journey", "encountered", []))
 
 static func story_key(scene: String, kind: String) -> String:
-	return "chapter_%d_%s" % [CHAPTERS.find(scene) + 1, kind]
+	return "chapter_%d_%s" % [ORDER.find(scene), kind]
 
 static func meet_chapter(scene: String, opening: Array[String] = []) -> void:
-	if scene not in CHAPTERS:
+	if scene not in ORDER:
 		return
 	var cfg := load_progress()
 	var encountered := scene_list(cfg.get_value("journey", "encountered", []))
@@ -99,7 +101,7 @@ static func meet_chapter(scene: String, opening: Array[String] = []) -> void:
 		push_warning("Could not record the encounter: %s" % error)
 
 static func complete_chapter(scene: String, ending: Array[String] = []) -> void:
-	if scene not in CHAPTERS:
+	if scene not in ORDER:
 		return
 	var cfg := load_progress()
 	if scene in scene_list(cfg.get_value("journey", "cleared", [])) and (ending.is_empty() or cfg.has_section_key("stories", story_key(scene, "ending"))):
