@@ -91,5 +91,22 @@ func run() -> void:
 	check(second.line == 1, "chapter two uses the same continue behavior")
 	second.queue_free()
 	await process_frame
+	var third = load("res://chapter3.tscn").instantiate()
+	third.test_mode = true
+	root.add_child(third)
+	third.set_physics_process(false)
+	third.set_process(false)
+	third._start_opening()
+	for entry: String in third.lines:
+		third.dialogue_box.show_line(entry)
+		third.dialogue_box.reveal_or_continue()
+		await process_frame
+		await process_frame
+		check(third.dialogue_box.body_label.get_content_height() <= third.dialogue_box.body_label.size.y, "chapter three dialogue fits: " + entry.left(24))
+	third.dialogue_box.show_line(third.lines[7])
+	third.dialogue_box.reveal_or_continue()
+	await shot("05_qingyan")
+	third.queue_free()
+	await process_frame
 	print("DIALOGUE UI RESULT: ", failures, " failures")
 	quit(failures)

@@ -15,16 +15,15 @@ run/main_scene="res://scenes/main_menu.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"
 
-[internationalization]
-
-locale/fallback="en"
-locale/test="en"
-
 [display]
 
 window/size/viewport_width=960
 window/size/viewport_height=540
 window/stretch/mode="canvas_items"
+
+[internationalization]
+
+locale/test="en"
 
 [physics]
 

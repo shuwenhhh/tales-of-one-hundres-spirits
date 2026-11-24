@@ -1,0 +1,6 @@
+Silk-lined open umbrella, 2026-11-18.
+Generated with the built-in ImageGen tool from the approved Xiaoyu guard pose.
+The illustration is the existing navy umbrella opened in side view, with a
+curved wooden handle and a fine ivory/gold silk lining. Transparent PNG.
+Used in the minimal in-game backpack. The in-game character's guard uses the
+separate normalized six-frame strip in assets/chapter1/pixel/girl/guard_v1/.

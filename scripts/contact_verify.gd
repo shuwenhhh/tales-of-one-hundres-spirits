@@ -42,10 +42,13 @@ func run():
 				tick(0.12,fps)
 				check(g.resolve == 29,"one swing only once")
 		setup()
-		for i in 3:
+		for i in 2:
 			g.begin_attack()
 			tick(0.55,fps)
-			check(g.resolve == 29-i,"consecutive attacks in same recovery")
+			check(g.resolve == 29-i,"two consecutive attacks connect before the boss escapes")
+		g.begin_attack()
+		tick(0.55,fps)
+		check(g.resolve == 28 and g.boss.y == g.FLOOR_Y,"boss avoids a stationary third swing while staying grounded")
 		setup()
 		g.boss.x = 450
 		g.begin_attack()
@@ -77,6 +80,15 @@ func run():
 		tick(0.55,60)
 	check(g.phase == "dialogue" and g.resolve == 0,"consecutive hits finish battle")
 	while g.phase == "dialogue": g.next_line()
+	if g.phase == "silk_lesson":
+		var tap := InputEventKey.new()
+		tap.physical_keycode = KEY_K
+		tap.pressed = true
+		g._unhandled_key_input(tap)
+		tick(.1, 60)
+		g._unhandled_key_input(tap)
+		tick(1.0, 60)
+		while g.phase == "dialogue": g.next_line()
 	check(g.phase == "peace" and g.memory,"memory flow preserved")
 	g.swing_audio.stop()
 	g.hit_audio.stop()

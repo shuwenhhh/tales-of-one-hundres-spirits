@@ -1,0 +1,55 @@
+{
+  "frame_size": [
+    128,
+    96
+  ],
+  "foot_anchor": [
+    40,
+    88
+  ],
+  "scale": 0.163727959697733,
+  "frames": [
+    {
+      "path": "assets/chapter1/pixel/girl/guard_v1/guard_00.png",
+      "foot_anchor": [
+        40,
+        88
+      ]
+    },
+    {
+      "path": "assets/chapter1/pixel/girl/guard_v1/guard_01.png",
+      "foot_anchor": [
+        40,
+        88
+      ]
+    },
+    {
+      "path": "assets/chapter1/pixel/girl/guard_v1/guard_02.png",
+      "foot_anchor": [
+        40,
+        88
+      ]
+    },
+    {
+      "path": "assets/chapter1/pixel/girl/guard_v1/guard_03.png",
+      "foot_anchor": [
+        40,
+        88
+      ]
+    },
+    {
+      "path": "assets/chapter1/pixel/girl/guard_v1/guard_04.png",
+      "foot_anchor": [
+        40,
+        88
+      ]
+    },
+    {
+      "path": "assets/chapter1/pixel/girl/guard_v1/guard_05.png",
+      "foot_anchor": [
+        40,
+        88
+      ]
+    }
+  ]
+}

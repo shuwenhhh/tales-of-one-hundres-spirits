@@ -1,0 +1,23 @@
+Chapter One dialogue overlays
+
+grandmother_panic.png: separate transparent heat-panic portrait, with
+exaggerated manga shock eyes, pin pupils, long screaming mouth and
+indigo stress lines. Generated from the existing portrait atlas and the
+user's manga expression reference using the built-in image tool.
+
+portraits.png: transparent 3x2 atlas. Top row: Xiaoyu calm, startled,
+sympathetic. Bottom row: Grandmother calm, panicked, grieving.
+memories.png: transparent 3x1 atlas. Silkworm and cocoon, imagined wings,
+boiling water and drawn silk.
+sky_dream.png: transparent imagined emergence from an opened cocoon,
+with an ivory silkmoth ascending toward blue cloud wisps. This appears
+on the blue-sky longing lines as an unfulfilled dream, before the boiling
+water recollection. Generated using the existing memory atlas as reference.
+free_moth.png: transparent silkmoth in open flight, shown on its own
+dialogue line after the emergence image. Its small drift is animated in
+the Chapter One scene while the rainy mountain background stays visible.
+
+Generated with the built-in image generation tool using the approved
+Chapter One visual preview as the style reference. During dialogue, the
+game draws the existing rainy mountain background and live weather,
+then these foreground portraits and optional memory drawings.

@@ -20,6 +20,15 @@ func tick(seconds: float):
 	for i in int(seconds * 60):
 		game._physics_process(1.0 / 60)
 
+func finish_story() -> void:
+	while game.phase in ["dialogue", "silk_lesson", "silk_reveal"]:
+		if game.phase == "dialogue":
+			key(KEY_E)
+		elif game.phase == "silk_lesson":
+			key(KEY_K)
+		else:
+			tick(1.0)
+
 func _initialize():
 	call_deferred("run")
 
@@ -41,15 +50,21 @@ func run():
 	game.player.x = 650
 	key(KEY_E)
 	check(game.phase == "dialogue", "nearby interaction starts dialogue")
+	check(game.panic_line_index > 0 and not game.is_grandmother_panicked(), "grandmother begins dialogue calm")
 	while game.phase in ["dialogue", "standing"]:
 		if game.phase == "standing":
 			tick(game.RISE_DURATION + 0.1)
 		else:
+			if game.dialogue[game.line_index].contains("HOT! HOT! HOT!!"):
+				check(game.line_index == game.panic_line_index and game.is_grandmother_panicked(), "panic begins at hot outburst")
+			if game.dialogue[game.line_index].contains("Make it stop."):
+				check(game.line_index > game.panic_line_index and game.is_grandmother_panicked(), "panic persists through last prebattle line")
 			key(KEY_E)
 	check(game.phase == "battle", "dialogue enters battle")
 	game.attack_number = 1
 	game.update_boss(1.81)
-	check(game.boss_state == "cast", "horizontal attack has telegraph")
+	check(game.boss_state in ["diagonal_cast", "cast", "dash_prepare", "wrap"], "boss chooses an existing attack from the player's position")
+	game.enter_boss_state("cast")
 	game.update_boss(0.86)
 	game.update_boss(0.01)
 	check(game.bullets.size() == 1, "horizontal silk spawns once")
@@ -114,19 +129,20 @@ func run():
 	game.player.x = 650
 	for i in game.MAX_RESOLVE:
 		game.boss_state = "recover"
+		game.boss = Vector2(735, game.FLOOR_Y)
+		game.player = Vector2(650, game.FLOOR_Y)
 		game.recovery_hit = false
 		game.boss_time = 0
 		game.attack_cd = 0
 		game.begin_attack()
 		tick(0.2)
 	check(game.phase == "dialogue" and game.resolve == 0, "combat victory enters story dialogue")
-	while game.phase == "dialogue":
-		key(KEY_E)
+	check(game.panic_line_index == -1 and not game.is_grandmother_panicked(), "postbattle dialogue restores calm portrait")
+	finish_story()
 	check(game.phase == "peace" and game.memory, "postbattle dialogue unlocks memory")
 	key(KEY_E)
 	check(game.phase == "dialogue", "grandmother remains interactable after battle")
-	while game.phase == "dialogue":
-		key(KEY_E)
+	finish_story()
 	check(game.memory, "repeat dialogue preserves single memory flag")
 	game.phase = "explore"
 	game.player.x = 440

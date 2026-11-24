@@ -3,9 +3,9 @@ extends RefCounted
 const PATH := "user://journey.cfg"
 const SETTINGS := "user://settings.cfg"
 const SAVE_VERSION := 2
-const CHAPTERS: Array[String] = ["res://chapter1.tscn", "res://chapter2.tscn", "res://chapter3.tscn"]
+const CHAPTERS: Array[String] = ["res://chapter1.tscn", "res://chapter2.tscn", "res://chapter3.tscn", "res://chapter4.tscn"]
 
-const ORDER: Array[String] = ["res://chapter0.tscn", "res://chapter1.tscn", "res://chapter2.tscn", "res://chapter3.tscn"]
+const ORDER: Array[String] = ["res://chapter0.tscn", "res://chapter1.tscn", "res://chapter2.tscn", "res://chapter3.tscn", "res://chapter4.tscn"]
 
 static func remember_chapter(scene: String) -> void:
 	if scene not in ORDER:
@@ -79,6 +79,18 @@ static func completed_chapters() -> Array[String]:
 
 static func has_met(scene: String) -> bool:
 	return scene in completed_chapters() or scene in scene_list(load_progress().get_value("journey", "encountered", []))
+
+static func has_silk_guard() -> bool:
+	return bool(load_progress().get_value("abilities", "silk_guard", false)) or CHAPTERS[0] in completed_chapters()
+
+static func silk_guard_practiced() -> bool:
+	return bool(load_progress().get_value("abilities", "silk_guard_practiced", false))
+
+static func unlock_silk_guard() -> Error:
+	var cfg := load_progress()
+	cfg.set_value("abilities", "silk_guard", true)
+	cfg.set_value("abilities", "silk_guard_practiced", true)
+	return save_progress(cfg)
 
 static func story_key(scene: String, kind: String) -> String:
 	return "chapter_%d_%s" % [ORDER.find(scene), kind]

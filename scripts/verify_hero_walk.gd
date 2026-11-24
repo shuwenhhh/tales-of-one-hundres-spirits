@@ -12,13 +12,6 @@ func hold_key(code: int, pressed: bool) -> void:
 	Input.flush_buffered_events()
 
 func run() -> void:
-	var gait = preload("res://scripts/hero_walk.gd").new()
-	# The planted sole stays on the road and cancels world movement during stance.
-	var a: Vector2 = gait.foot_at(0.1)
-	var b: Vector2 = gait.foot_at(0.2)
-	assert(a.y == 0.0 and b.y == 0.0)
-	assert(is_equal_approx(b.x - a.x, -gait.STRIDE * 0.1))
-	assert(gait.foot_at(0.75).y < -6.0)
 	DirAccess.make_dir_recursive_absolute("res://art_review/walking")
 	for chapter in [1, 2]:
 		var game = load("res://chapter%d.tscn" % chapter).instantiate()

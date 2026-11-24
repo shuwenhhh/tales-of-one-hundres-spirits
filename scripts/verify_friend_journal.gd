@@ -109,6 +109,8 @@ func run() -> void:
 	root.add_child(second)
 	second.set_physics_process(false)
 	second.phase = "battle"
+	# Exercise a real hit after the encounter's opening protection ends.
+	second.battle_elapsed = second.OPENING_GRACE
 	second.x = second.boss_x - 70
 	second.facing = 1
 	second.grief = 1
@@ -116,6 +118,7 @@ func run() -> void:
 	second.boss_state = "ouch"
 	second._physics_process(.016)
 	check(second.grief == 0 and JOURNEY.continue_scene() == JOURNEY.CHAPTERS[2], "real chapter two final hit advances Continue during the settling animation")
+	second._physics_process(.1) # Finish the existing hit pause before settling.
 	second._physics_process(second.SETTLE_DURATION + .1)
 	check("Take care" in JOURNEY.recorded_dialogue(JOURNEY.CHAPTERS[1]), "chapter two outro is added to the friend's story")
 	second.queue_free()
@@ -126,6 +129,8 @@ func run() -> void:
 	third.phase = "battle"
 	third.boss_hp = 1
 	third._hit_boss(1)
+	while third.phase == "dialogue":
+		third._next_line()
 	check(JOURNEY.completed_chapters().size() == 3, "real chapter three victory records Qingyan")
 	third.queue_free()
 	await process_frame

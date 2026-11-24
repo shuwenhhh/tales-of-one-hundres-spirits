@@ -25,6 +25,17 @@ func move_axis(axis: int):
 func _initialize():
 	call_deferred("run")
 
+func advance_story() -> void:
+	while game.phase in ["dialogue", "standing", "silk_lesson", "silk_reveal"]:
+		if game.phase == "dialogue":
+			key(KEY_E)
+		elif game.phase == "standing":
+			game._physics_process(game.RISE_DURATION + .01)
+		elif game.phase == "silk_lesson":
+			key(KEY_K)
+		else:
+			game._physics_process(1.0)
+
 func run():
 	game = load("res://chapter1.tscn").instantiate()
 	game.test_mode = true
@@ -35,8 +46,7 @@ func run():
 		game._physics_process(1.0/60)
 	move_axis(0)
 	key(KEY_E)
-	while game.phase == "dialogue":
-		key(KEY_E)
+	advance_story()
 	var elapsed := 0.0
 	while game.phase == "battle" and elapsed < 360:
 		seen[game.boss_state] = true
@@ -80,8 +90,7 @@ func run():
 		return
 	game.test_mode = false
 	game.save_path = "user://moving_boss_verification.cfg"
-	while game.phase == "dialogue":
-		key(KEY_E)
+	advance_story()
 	var cfg = ConfigFile.new()
 	assert(cfg.load(game.save_path)==OK and cfg.get_value("story","silkworm",false))
 	DirAccess.remove_absolute(game.save_path)

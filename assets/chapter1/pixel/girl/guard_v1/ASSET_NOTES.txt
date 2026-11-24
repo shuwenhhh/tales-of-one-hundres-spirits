@@ -1,0 +1,22 @@
+Silk umbrella guard animation, 2026-11-18.
+
+Source: assets/characters/source/girl_guard_v1_raw.png, generated in one built-in
+ImageGen strip from the user's approved six-slot reference canvas, guard pose,
+and existing heroine idle. The supplied reference image is PNG raster artwork.
+The six-frame animation preserves its character, costume and umbrella design.
+
+Preparation: python tools/normalize_girl_guard.py. The optional skill scripts
+are unavailable, so this uses the project's shared pixelize_sprites functions.
+One shared scale, 32-color palette, hard alpha and fixed (40, 88) foot anchor
+on 128x96 transparent canvases. No per-frame resizing. Six poses: neutral,
+raised closed umbrella, half-open, open guard, yielding to contact, lowering.
+Left-facing frames are mirrored in memory around the same anchor.
+
+Runtime: scripts/silk_guard.gd; open in 0.18 seconds, short guarded hold,
+contact response, then a 0.20-second closing sequence. Movement or attacks
+can interrupt the closing visual without leaving an extra body or umbrella.
+Tutorial holds the open pose for about one second, then clears it before
+continuing dialogue. Sparks and rain droplets are runtime effects, not baked.
+
+Reviews: art_review/silk_guard/guard_preview.png and guard_animation.gif;
+in-game screenshots: art_review/silk_gift/.

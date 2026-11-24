@@ -1,6 +1,8 @@
 extends Node2D
 
 const JOURNEY := preload("res://scripts/journey_state.gd")
+const TRANSITION := preload("res://scripts/scene_transition.gd")
+const SILK_LESSON := "[silk_guard_lesson]"
 
 const FLOOR_Y = 429.0
 const WALK_SPEED := 120.0
@@ -12,6 +14,10 @@ const BODY_GAP := 84.0
 const HIT_GAP := 90.0
 # The art's walking surface is at 84% height; map it to the gameplay floor.
 const BACKGROUND_ROAD_Y := 0.84
+const ASCENT_BOUNDS := [Rect2(97,153,116,87), Rect2(108,132,114,108), Rect2(87,127,128,133), Rect2(69,130,145,122), Rect2(81,131,126,124), Rect2(93,126,121,117)]
+const LANDING_BOUNDS := [Rect2(106,123,117,106), Rect2(105,109,105,148), Rect2(100,90,115,144), Rect2(99,170,139,70), Rect2(102,160,135,80), Rect2(101,134,113,106)]
+const ASCENT_HEIGHTS := [130.0, 130.0, 130.0, 130.0, 130.0, 130.0]
+const LANDING_HEIGHTS := [130.0, 130.0, 130.0, 92.0, 96.0, 116.0]
 var background: Texture2D
 var font = preload("res://assets/chapter1/chinese.ttc")
 var frames: Array[Texture2D] = []
@@ -32,11 +38,17 @@ var vy = 0.0
 var facing = 1
 var moving = false
 var walk = preload("res://scripts/hero_walk.gd").new()
+var silk_guard = preload("res://scripts/silk_guard.gd").new()
+var inventory = preload("res://scripts/inventory_panel.gd").new()
+var guard_practiced: bool = false
+var lesson_prompt: Label
+var lesson_reveal: float = 0.0
 var hp = 6
 var resolve = MAX_RESOLVE
 var phase = "explore"
 var clock_time = 0.0
 var dash = 0.0
+var dash_speed: float = 490.0
 var dash_cd = 0.0
 var invulnerable = 0.0
 var attack = 0.0
@@ -66,6 +78,15 @@ var boss_origin := Vector2.ZERO
 var boss_target := Vector2.ZERO
 var impact_time := 0.0
 var attack_number = 0
+var boss_rng := RandomNumberGenerator.new()
+var last_boss_attack: String = ""
+var ground_attacks: int = 0
+var recovery_duration: float = 1.6
+var rest_duration: float = 1.0
+var ground_hit_count: int = 0
+var last_ground_hit: float = -10.0
+var evading: bool = false
+var evasion_target_x: float = 0.0
 var volley_shots: int = 0
 var silk_aim := Vector2.ZERO
 var bullets: Array[Dictionary] = []
@@ -73,7 +94,15 @@ var rain: Array[Vector2] = []
 var weather = preload("res://scripts/rain_weather.gd").new()
 var dialogue: Array[String] = []
 var dialogue_box = preload("res://scripts/dialogue_box.gd").new()
+var story_portraits: Texture2D
+var story_panic: Texture2D
+var story_memories: Texture2D
+var story_sky_dream: Texture2D
+var story_free_moth: Texture2D
+var story_silkworm: Texture2D
+var story_cocoon: Texture2D
 var line_index = 0
+var panic_line_index = -1
 var after_dialogue = "battle"
 var memory = false
 var memory_open = false
@@ -85,12 +114,6 @@ var battle_time = 0.0
 var test_mode = false
 var save_path = SAVE_PATH
 
-func cropped_texture(image: Image) -> Texture2D:
-	var bounds = image.get_used_rect()
-	if bounds.size.x > 0 and bounds.size.y > 0:
-		image = image.get_region(bounds)
-	return ImageTexture.create_from_image(image)
-
 # Character art is pre-reduced to its on-screen size (tools/pixelize_sprites.py):
 # one art pixel == one screen pixel, sampled NEAREST so every character shares
 # the background's pixel grid. Text and UI keep the node's LINEAR filter.
@@ -101,6 +124,7 @@ static func pixel_texture(path: String) -> Texture2D:
 	return tex
 
 func _ready():
+	boss_rng.randomize()
 	if not test_mode:
 		JOURNEY.remember_chapter("res://chapter1.tscn")
 		JOURNEY.apply_preferences()
@@ -110,6 +134,30 @@ func _ready():
 	background = pixel_texture("res://assets/chapter1/backgrounds/rain_town_pixel_v1.png")
 	combat_sounds.setup(self)
 	dialogue_box.mount(self)
+	story_portraits = pixel_texture("res://assets/chapter1/story_dialogue/portraits.png")
+	story_panic = pixel_texture("res://assets/chapter1/story_dialogue/grandmother_panic.png")
+	story_memories = pixel_texture("res://assets/chapter1/story_dialogue/memories.png")
+	story_sky_dream = pixel_texture("res://assets/chapter1/story_dialogue/sky_dream.png")
+	story_free_moth = pixel_texture("res://assets/chapter1/story_dialogue/free_moth.png")
+	story_silkworm = pixel_texture("res://assets/chapter1/story_dialogue/silkworm.png")
+	story_cocoon = pixel_texture("res://assets/chapter1/story_dialogue/cocoon.png")
+	# Chapter One always begins before this playthrough's gift, even on old saves.
+	silk_guard.setup(false)
+	guard_practiced = JOURNEY.silk_guard_practiced()
+	inventory.mount(self)
+	lesson_prompt = Label.new()
+	lesson_prompt.text = "Press K · Open the umbrella"
+	lesson_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lesson_prompt.add_theme_font_override("font", font)
+	lesson_prompt.add_theme_font_size_override("font_size", 18)
+	lesson_prompt.add_theme_color_override("font_color", Color("e7dbc3"))
+	lesson_prompt.add_theme_color_override("font_shadow_color", Color("111827"))
+	lesson_prompt.add_theme_constant_override("shadow_offset_y", 2)
+	dialogue_box.get_parent().add_child(lesson_prompt)
+	lesson_prompt.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	lesson_prompt.offset_top = -90
+	lesson_prompt.offset_bottom = -52
+	lesson_prompt.hide()
 	swing_audio = combat_sounds.players["umbrella_swing"]
 	hit_audio = combat_sounds.players["umbrella_hit"]
 	for i in 6:
@@ -134,6 +182,17 @@ func _unhandled_key_input(event):
 	if not event.pressed or event.echo:
 		return
 	var key = event.physical_keycode
+	if event.is_action_pressed(&"open_inventory") and not paused and not memory_open and phase in ["explore", "battle", "peace"]:
+		if inventory.opened:
+			inventory.close()
+		else:
+			silk_guard.cancel()
+			walk.stop_audio()
+			combat_sounds.stop_all()
+			inventory.present(silk_guard.enabled)
+		return
+	if inventory.opened:
+		return
 	if key == KEY_F6:
 		reduce_shake = not reduce_shake
 		if not test_mode:
@@ -164,11 +223,34 @@ func _unhandled_key_input(event):
 		if key == KEY_R:
 			retry()
 		return
+	if phase == "silk_lesson":
+		if silk_guard.handle_input(event, facing) and silk_guard.active():
+			equipped = true
+			phase = "silk_reveal"
+			lesson_reveal = .95
+			silk_guard.deflect()
+			combat_sounds.play("umbrella_swing")
+		return
+	if phase == "silk_reveal":
+		return
 	if phase == "dialogue":
 		if key in [KEY_E, KEY_ENTER, KEY_SPACE]:
 			if dialogue_box.reveal_or_continue():
 				next_line()
 		return
+	if silk_guard.handle_input(event, facing):
+		if silk_guard.active():
+			equipped = true
+			attack = 0
+			buffered_attack = 0
+			dash = 0
+			walk.stop_audio()
+			combat_sounds.play("umbrella_swing")
+		return
+	if silk_guard.active():
+		return
+	if key in [KEY_SPACE, KEY_SHIFT]:
+		silk_guard.interrupt_close()
 	if key == KEY_E and absf(player.x - boss.x) < 110 and phase in ["explore", "peace"]:
 		interact()
 	if key == KEY_1:
@@ -177,7 +259,17 @@ func _unhandled_key_input(event):
 		buffered_attack = 0
 	if key == KEY_SPACE and player.y >= FLOOR_Y - 1:
 		vy = -355
-	if key in [KEY_SHIFT, KEY_K] and dash_cd <= 0:
+	if key == KEY_SHIFT and dash_cd <= 0:
+		var direction := int(Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT)) - int(Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT))
+		if direction != 0:
+			facing = direction
+		dash_speed = 490.0
+		var gap_ahead: float = (boss.x - player.x) * facing
+		if phase == "battle" and bodies_overlap_vertically() and gap_ahead >= 0.0 and gap_ahead <= BODY_GAP + 26.0:
+			# Cover the whole cloak in one dash instead of ending inside it and
+			# being pushed back into the corner when ordinary collision resumes.
+			var exit_x := clampf(boss.x + facing * (BODY_GAP + 4.0), 30.0, 930.0)
+			dash_speed = maxf(dash_speed, absf(exit_x - player.x) / .18)
 		dash = 0.18
 		dash_cd = 0.9
 		invulnerable = maxf(invulnerable, 0.23)
@@ -185,6 +277,9 @@ func _unhandled_key_input(event):
 		begin_attack()
 
 func begin_attack(upward: bool = false):
+	if silk_guard.active():
+		return
+	silk_guard.interrupt_close()
 	if equipped and phase in ["battle", "explore", "peace"] and (hit_stop > 0 or (attack_cd > 0 and attack_cd < 0.16)):
 		buffered_attack = maxf(0.18, attack_cd + 0.04)
 		buffered_up = upward or Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP)
@@ -204,50 +299,74 @@ func interact():
 	if phase == "peace":
 		start_dialogue([
 			"Grandmother: Is it still raining?",
-			"Xiaoyu: Yes. It hasn't stopped.",
-			"Grandmother: Good. Please tell it I was wrong.",
-			"Xiaoyu: You can tell it yourself.",
-			"Grandmother: I tried. It's very loud.",
+			"Xiaoyu: No. It hasn't stopped.",
 		], "peace")
 	else:
 		start_dialogue([
-			"Grandmother: AAAAAH! HOT! HOT! HOT!",
-			"Xiaoyu: Did you spill hot water?",
-			"Grandmother: I don't own a kettle!",
-			"Xiaoyu: Then what's hot?",
-			"Grandmother: An excellent question. Could you ask it less loudly?",
-			"Xiaoyu: You're sitting in the rain.",
-			"Grandmother: Then the rain is doing a terrible job.",
-			"Xiaoyu: It's freezing!",
-			"Grandmother: Tell it to try harder.",
-			"Xiaoyu: ...Rain? Please try harder.",
-			"Grandmother: Thank you.",
-			"(She waits. The rain keeps falling.)",
-			"Grandmother: It didn't work.",
-			"Xiaoyu: I don't think it heard me.",
-			"Grandmother: N-no... It's getting hotter. I can hear the water.",
-			"Xiaoyu: You mean the rain?",
-			"Grandmother: Not that water! S-someone's trying to boil me!",
-			"Xiaoyu: What?! Who is?",
-			"Grandmother: I don't know! I can't see them! I—I think I'm melting!",
-			"(White silk bursts from beneath her cloak.)",
-			"(The spinning wheel turns on its own.)",
-			"Grandmother: Please... make it stop!",
-			"(The silk lashes toward Xiaoyu.)",
+			"Xiaoyu: AH! You scared me!",
+			"Xiaoyu: Oh... Hello, Grandma!",
+			"Grandmother: Oh! A little visitor!",
+			"Grandmother: How old are you, sweetie? Seven? Eight?",
+			"Xiaoyu: I'm not THAT little!",
+			"Grandmother: Ho ho! Of course not.",
+			"Grandmother: What brings you out in this weather?",
+			"Xiaoyu: I got lost...",
+			"Grandmother: Oh, you poor thing.",
+			"Grandmother: Come along. Grandma has candy!",
+			"Xiaoyu: Really?!",
+			"Grandmother: Unless I've eaten it all.",
+			"Xiaoyu: ...",
+			"Grandmother: Ho ho! Just kidding!",
+			"Xiaoyu: Hehe...",
+			"Xiaoyu: ...Is it just me, or is it really hot here?",
+			"Grandmother: Hot?",
+			"Xiaoyu: Yeah. I'm sweating.",
+			"Xiaoyu: But it's raining...",
+			"Grandmother: ...",
+			"Grandmother: Hot...",
+			"Grandmother: Yes. It is hot.",
+			"Grandmother: Very... hot...",
+			"Xiaoyu: Grandma?",
+			"Grandmother: AAAAAAH!!",
+			"Grandmother: HOT! HOT! HOT!!",
+			"Xiaoyu: W-WHAT?!",
+			"Grandmother: IT BURNS!!",
+			"Xiaoyu: Grandma! It's raining!",
+			"Grandmother: THEN WHY WON'T IT STOP?!",
+			"Xiaoyu: What won't stop?!",
+			"Grandmother: The water...",
+			"Grandmother: I can hear it boiling...",
+			"Xiaoyu: ...Grandma?",
+			"Grandmother: Please...",
+			"Grandmother: Make it stop.",
 		], "battle")
 
 func start_dialogue(lines: Array[String], next_phase: String):
+	silk_guard.cancel()
 	walk.stop_audio()
 	combat_sounds.stop("silk_charge")
-	dialogue = dialogue_box.merge_lines(lines, 2 if next_phase == "battle" and not granny_stood else 0)
+	var story_breaks := PackedStringArray()
+	if next_phase == "peace" and resolve <= 0:
+		story_breaks = PackedStringArray(["I used to be a silkworm", "I made myself a little cocoon", "I thought if I waited", "I dreamed I could fly", "Someone put my cocoon", "They wanted the silk", "I suppose they had no use", "Now, take this"])
+	elif next_phase == "battle":
+		story_breaks = PackedStringArray(["Hot...", "Yes. It is hot.", "Very... hot...", "AAAAAAH!!", "HOT! HOT! HOT!!", "IT BURNS!!", "The water...", "I can hear it boiling...", "Please...", "Make it stop."])
+	dialogue = dialogue_box.merge_lines(lines, 2 if next_phase == "battle" and not granny_stood else 0, story_breaks)
 	line_index = 0
+	panic_line_index = -1
+	if next_phase == "battle":
+		for i in dialogue.size():
+			if dialogue[i].contains("HOT! HOT! HOT!!"):
+				panic_line_index = i
+				break
 	after_dialogue = next_phase
 	phase = "dialogue"
 	moving = false
 	hit_stop = 0
+	hit_feedback = 0.0
 	buffered_attack = 0
 	attack = 0
 	dash = 0
+	dash_speed = 490.0
 	vy = 0
 	player.y = FLOOR_Y
 	dialogue_box.show_line(dialogue[0])
@@ -255,22 +374,32 @@ func start_dialogue(lines: Array[String], next_phase: String):
 		if next_phase == "battle":
 			JOURNEY.meet_chapter("res://chapter1.tscn", dialogue)
 		elif next_phase == "peace" and resolve <= 0:
-			JOURNEY.complete_chapter("res://chapter1.tscn", dialogue)
+			var recorded: Array[String] = []
+			for entry: String in dialogue:
+				if entry != SILK_LESSON:
+					recorded.append(entry)
+			JOURNEY.complete_chapter("res://chapter1.tscn", recorded)
 
 func next_line():
 	line_index += 1
+	if line_index < dialogue.size() and dialogue[line_index] == SILK_LESSON:
+		silk_guard.enabled = true
+		if not guard_practiced:
+			phase = "silk_lesson"
+			silk_guard.cooldown = 0
+			silk_guard.cancel()
+			dialogue_box.hide()
+			return
+		line_index += 1
 	if line_index < dialogue.size():
 		dialogue_box.show_line(dialogue[line_index])
-	if after_dialogue == "battle" and not granny_stood and line_index == 2:
-		phase = "standing"
-		dialogue_box.hide()
-		rise_time = 0.0
-		queue_redraw()
-		return
 	if line_index >= dialogue.size():
 		dialogue_box.hide()
 		phase = after_dialogue
 		if phase == "battle":
+			# The portrait conversation stays continuous; stand when combat begins.
+			granny_stood = true
+			rise_time = RISE_DURATION
 			boss_state = "rest"
 			boss_time = 0
 			toast_time = 0
@@ -278,12 +407,18 @@ func next_line():
 			unlock_memory()
 
 func enter_next_chapter() -> void:
-	var error := get_tree().change_scene_to_file(NEXT_CHAPTER)
+	silk_guard.cancel()
+	walk.stop_audio()
+	combat_sounds.stop_all()
+	var error := TRANSITION.start(get_tree(), NEXT_CHAPTER, _chapter_transition_failed)
 	if error != OK:
-		push_error("Could not enter chapter two: %s" % error)
-		phase = "peace"
-		toast = "Could not load the Peach Blossom Garden."
-		toast_time = 12.0
+		_chapter_transition_failed(error)
+
+func _chapter_transition_failed(error: Error) -> void:
+	phase = "peace"
+	toast = "Could not load the Peach Blossom Garden."
+	toast_time = 12.0
+	push_warning("Chapter transition failed: %s" % error)
 
 func unlock_memory():
 	memory = true
@@ -295,6 +430,8 @@ func unlock_memory():
 			push_warning("Could not save memory: " + str(error))
 
 func retry():
+	silk_guard.cancel()
+	silk_guard.cooldown = 0
 	combat_sounds.stop_all()
 	met_granny = true
 	granny_stood = true
@@ -315,6 +452,7 @@ func retry():
 	vy = 0
 	dash = 0
 	dash_cd = 0
+	dash_speed = 490.0
 	attack = 0
 	attack_cd = 0
 	attack_up = false
@@ -324,22 +462,50 @@ func retry():
 	boss_state = "rest"
 	boss_time = 0
 	attack_number = 0
+	last_boss_attack = ""
+	ground_attacks = 0
+	recovery_duration = 1.6
+	rest_duration = 1.0
+	ground_hit_count = 0
+	last_ground_hit = -10.0
+	evading = false
 	battle_time = 0
 	phase = "battle"
 
 func _process(delta: float) -> void:
 	weather.advance(delta)
 	queue_redraw()
-	dialogue_box.visible = phase == "dialogue" and not paused and not memory_open
+	dialogue_box.visible = phase == "dialogue" and not paused and not memory_open and not inventory.opened
+	lesson_prompt.visible = phase == "silk_lesson" and not paused and not memory_open
+	if lesson_prompt.visible:
+		lesson_prompt.anchor_right = 0
+		lesson_prompt.offset_left = clampf(player.x - 170.0, 24.0, get_viewport_rect().size.x - 364.0)
+		lesson_prompt.offset_right = lesson_prompt.offset_left + 340.0
 	if dialogue_box.visible and dialogue_box.advance_time(delta, Input.is_physical_key_pressed(KEY_CTRL)):
 		next_line()
 
 func _physics_process(dt):
-	if paused or memory_open:
+	if paused or memory_open or inventory.opened:
 		walk.stop_audio()
 		combat_sounds.stop_all()
 		return
 	if phase == "leaving":
+		return
+	silk_guard.advance(dt, phase in ["explore", "battle", "peace", "silk_lesson", "silk_reveal"])
+	if phase == "silk_lesson":
+		return
+	if phase == "silk_reveal":
+		lesson_reveal -= dt
+		silk_guard.remaining = maxf(silk_guard.remaining, .12)
+		if lesson_reveal <= 0:
+			silk_guard.cancel()
+			guard_practiced = true
+			if not test_mode:
+				var error := JOURNEY.unlock_silk_guard()
+				if error != OK:
+					push_warning("Could not save the silk gift: %s" % error)
+			phase = "dialogue"
+			next_line()
 		return
 	spinning.advance(dt, (phase == "explore" and not met_granny) or (phase == "dialogue" and after_dialogue == "battle" and line_index >= dialogue.size() - 3))
 	if phase == "standing":
@@ -360,13 +526,13 @@ func _physics_process(dt):
 	clock_time += dt
 	impact_time = maxf(0, impact_time - dt)
 	toast_time = maxf(0, toast_time - dt)
+	hit_feedback = maxf(0, hit_feedback - dt)
 	if phase in ["dialogue", "failed"]:
 		queue_redraw()
 		return
 	dash_cd = maxf(0, dash_cd - dt)
 	invulnerable = maxf(0, invulnerable - dt)
 	attack_cd = maxf(0, attack_cd - dt)
-	hit_feedback = maxf(0, hit_feedback - dt)
 	var previous_attack: float = attack
 	var previous_player: Vector2 = player
 	var previous_boss: Vector2 = boss
@@ -379,9 +545,15 @@ func _physics_process(dt):
 		begin_attack(buffered_up)
 		previous_attack = attack
 	var axis = float(Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT)) - float(Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT))
+	if silk_guard.active():
+		axis = 0
+		facing = silk_guard.facing
+	elif axis != 0:
+		silk_guard.interrupt_close()
 	moving = axis != 0
+	var dash_active: bool = dash > 0.0
 	if dash > 0:
-		player.x += facing * 490 * dt
+		player.x += facing * dash_speed * dt
 		dash -= dt
 	else:
 		player.x += axis * WALK_SPEED * dt
@@ -405,7 +577,7 @@ func _physics_process(dt):
 	if phase == "battle":
 		battle_time += dt
 		update_boss(dt)
-		resolve_body_overlap(previous_player, previous_boss)
+		resolve_body_overlap(previous_player, previous_boss, dash_active)
 		update_bullets(dt)
 		# Sample the moving weapon against the moving boss during the active part.
 		# Each swing owns its hit flag; no hidden invulnerability between swings.
@@ -420,9 +592,11 @@ func _physics_process(dt):
 					attack_hit = true
 					resolve = maxi(0,resolve-1)
 					trigger_impact()
-					separate_after_hit()
+					separate_after_hit(dash_active)
 					if resolve <= 0:
 						win_battle()
+					else:
+						respond_to_ground_hit()
 					break
 
 	moving = absf(player.x - previous_player.x) > 0.01
@@ -445,9 +619,12 @@ func separate_bodies(gap: float, side: float, player_share: float) -> void:
 	boss_origin += shift
 	boss_target += shift
 
-func resolve_body_overlap(previous_player: Vector2, previous_boss: Vector2) -> void:
+func resolve_body_overlap(previous_player: Vector2, previous_boss: Vector2, dash_active: bool = false) -> void:
 	# Only an active enemy blocks the road. Once calmed, she must not gate the exit.
 	if phase != "battle" or not bodies_overlap_vertically():
+		return
+	# Include the final movement frame even if its dash timer just reached zero.
+	if dash_active or dash > 0.0:
 		return
 	# Fast boss attacks retain their swept damage and can cross the player.
 	# Their recovery/landing restores ordinary body spacing on the next frame.
@@ -458,7 +635,9 @@ func resolve_body_overlap(previous_player: Vector2, previous_boss: Vector2) -> v
 		side = -float(facing)
 	separate_bodies(BODY_GAP, side, 1.0)
 
-func separate_after_hit() -> void:
+func separate_after_hit(dash_active: bool = false) -> void:
+	if dash_active or dash > 0.0:
+		return
 	if not bodies_overlap_vertically() or absf(player.y - boss.y) > 45.0:
 		return
 	var side := signf(player.x - boss.x)
@@ -467,23 +646,102 @@ func separate_after_hit() -> void:
 	# Stop adding distance once both actors are clearly separated, so combos reach.
 	separate_bodies(HIT_GAP, side, 0.65)
 
+func respond_to_ground_hit() -> void:
+	if phase != "battle" or boss.y < FLOOR_Y - 10.0 or boss_state not in ["rest", "recover", "land", "cast", "volley", "diagonal_cast", "release"]:
+		return
+	ground_hit_count = ground_hit_count + 1 if battle_time - last_ground_hit <= 1.05 else 1
+	last_ground_hit = battle_time
+	if ground_hit_count >= 2:
+		var away := signf(boss.x - player.x)
+		if away == 0.0:
+			away = -float(facing)
+		var retreat: float = clampf(boss.x + away * 110.0, 95.0, 865.0)
+		# At a wall, lift off in place rather than bulldozing the player sideways.
+		if absf(retreat - boss.x) < 55.0:
+			retreat = boss.x
+		enter_boss_state("sidestep")
+		evading = true
+		evasion_target_x = retreat
+		ground_hit_count = 0
+	elif boss_state == "recover":
+		recovery_duration = minf(recovery_duration, boss_time + .40)
+	elif boss_state == "rest":
+		rest_duration = minf(rest_duration, boss_time + .18)
+
+func flight_target_from_player(spacing: float, height: float) -> Vector2:
+	# Prefer the near side but sometimes cross over; switch again if the wall
+	# cannot fit the spacing. Sample once per flight phase, never home.
+	var side := signf(boss.x - player.x)
+	if side == 0.0:
+		side = -float(facing)
+	if boss_rng.randf() < .35:
+		side *= -1.0
+	var target_x: float = player.x + side * spacing
+	if target_x < 100.0 or target_x > 860.0:
+		target_x = player.x - side * spacing
+	return Vector2(clampf(target_x, 100.0, 860.0), height)
+
+func choose_boss_attack() -> String:
+	var distance: float = absf(player.x - boss.x)
+	var weights := {"diagonal_cast": 3.8, "cast": 2.4, "dash_prepare": 2.0, "wrap": 1.4}
+	if distance < 145.0:
+		weights = {"diagonal_cast": 1.8, "cast": .35, "dash_prepare": .9, "wrap": 3.6}
+	elif distance > 340.0:
+		weights = {"diagonal_cast": 3.8, "cast": .7, "dash_prepare": 3.0, "wrap": 2.4}
+	if player.y < FLOOR_Y - 45.0:
+		weights.diagonal_cast *= 2.6
+		weights.cast *= .2
+		weights.dash_prepare *= .5
+	# Let the ground vocabulary play out before the aerial pattern returns.
+	if ground_attacks < 3:
+		weights.wrap = 0.0
+	elif ground_attacks >= 4:
+		weights.wrap *= 2.0
+	if not last_boss_attack.is_empty():
+		weights[last_boss_attack] *= .12
+	var total := 0.0
+	for weight: float in weights.values():
+		total += weight
+	var roll := boss_rng.randf() * total
+	for state: String in weights:
+		roll -= float(weights[state])
+		if roll <= 0.0:
+			return state
+	return "diagonal_cast"
+
+func aimed_silk_origin() -> Vector2:
+	# Emit beside the extended arm at chest height. The old high, far-forward
+	# origin made every strand point steeply into the road at melee distance.
+	return boss + Vector2(boss_direction * 40.0, -50.0)
+
 func update_boss(dt):
 	boss_time += dt
 	match boss_state:
+		"sidestep":
+			boss.x = move_toward(boss.x, evasion_target_x, 360.0 * dt)
+			if boss_time >= .38:
+				enter_boss_state("rest")
 		"rest":
 			if absf(player.x - boss.x) > 155:
-				boss.x = move_toward(boss.x, player.x, 42 * dt)
+				boss.x = move_toward(boss.x, player.x, 80 * dt)
 			boss_direction = -1 if player.x < boss.x else 1
-			if boss_time >= 1.2:
+			if boss_time >= rest_duration:
 				boss_direction = -1 if player.x < boss.x else 1
-				enter_boss_state(["diagonal_cast", "cast", "dash_prepare", "wrap"][attack_number % 4])
+				var chosen := choose_boss_attack()
+				last_boss_attack = chosen
+				ground_attacks = 0 if chosen == "wrap" else ground_attacks + 1
+				enter_boss_state(chosen)
 		"diagonal_cast":
+			# Track the windup, then commit for its last 0.2 seconds.
+			if boss_time - dt < .65:
+				silk_aim = player + Vector2(0, -36)
+				boss_direction = -1 if silk_aim.x < boss.x else 1
 			if boss_time >= 0.85:
 				combat_sounds.play("silk_shot")
 				for offset in [-0.32, 0.0, 0.32]:
-					var origin: Vector2 = boss + Vector2(boss_direction * 55, -78)
+					var origin: Vector2 = aimed_silk_origin()
 					var direction: Vector2 = (silk_aim - origin).normalized().rotated(offset)
-					spawn_silk(origin, direction * 230, 38.0)
+					spawn_silk(origin, direction * 250, 38.0)
 				enter_boss_state("release")
 		"cast":
 			if boss_time >= 0.85:
@@ -500,8 +758,10 @@ func update_boss(dt):
 			if boss_time >= 0.3:
 				enter_boss_state("recover")
 		"wrap":
+			if evading:
+				boss.x = move_toward(boss.x, evasion_target_x, 210.0 * dt)
 			if boss_time >= 0.7:
-				boss_target = Vector2([240.0,480.0,720.0][int(attack_number / 4) % 3],245)
+				boss_target = flight_target_from_player(boss_rng.randf_range(145.0, 255.0), boss_rng.randf_range(220.0, 275.0))
 				enter_boss_state("rise")
 		"rise":
 			boss = boss_origin.lerp(boss_target, smoothstep(0.0,1.0,minf(boss_time/0.9,1.0)))
@@ -516,7 +776,7 @@ func update_boss(dt):
 				enter_boss_state("air_fire")
 		"air_fire":
 			if boss_time >= 0.8:
-				boss_target = Vector2(clampf(player.x + (110 if player.x < boss.x else -110),100,860),FLOOR_Y)
+				boss_target = flight_target_from_player(boss_rng.randf_range(90.0, 145.0), FLOOR_Y)
 				enter_boss_state("dive_prepare")
 		"dive_prepare":
 			if boss_time >= 0.65:
@@ -546,26 +806,43 @@ func update_boss(dt):
 			if boss_time >= 0.4:
 				enter_boss_state("recover")
 		"recover":
-			if boss_time >= 1.6:
+			# A brief punish window, shortened further when pressured by hits.
+			if boss_time >= recovery_duration:
 				enter_boss_state("rest")
 				attack_number += 1
 
 func enter_boss_state(state: String):
+	var previous_state: String = boss_state
 	boss_state = state
 	boss_time = 0.0
 	boss_origin = boss
+	if state != "sidestep":
+		evading = false
+	if state in ["wrap", "air_charge", "dive_prepare"] and not is_equal_approx(player.x, boss.x):
+		boss_direction = -1 if player.x < boss.x else 1
 	if state in ["cast", "diagonal_cast", "air_charge"]:
 		combat_sounds.play("silk_charge")
 	if state == "volley":
 		volley_shots = 0
 	if state == "diagonal_cast":
-		silk_aim = player + Vector2(0,-30)
+		silk_aim = player + Vector2(0,-36)
+	if state == "recover":
+		recovery_duration = boss_rng.randf_range(1.05, 1.45) if previous_state == "land" else boss_rng.randf_range(.65, .95)
+	if state == "rest":
+		rest_duration = boss_rng.randf_range(.22, .42)
 	if state in ["recover", "air_fire"]:
 		recovery_hit = false
 
-func damage_player():
+func damage_player(source: Vector2 = Vector2(INF, INF)):
+	if phase == "battle" and silk_guard.blocks_body(player, boss + Vector2(0, -50) if is_inf(source.x) else source):
+		silk_guard.deflect()
+		combat_sounds.play("umbrella_hit")
+		if silk_guard.claim_counter():
+			_silk_counter_boss()
+		return
 	if invulnerable > 0 or phase != "battle":
 		return
+	silk_guard.cancel()
 	hp -= 1
 	invulnerable = 1.2
 	if hp <= 0:
@@ -576,18 +853,48 @@ func damage_player():
 func spawn_silk(pos: Vector2, velocity: Vector2, length: float = 44.0):
 	bullets.append({"pos": pos, "velocity": velocity, "life": 5.0,"length":length})
 
+func _silk_counter_boss() -> void:
+	if phase != "battle":
+		return
+	resolve = maxi(0, resolve - 1)
+	hit_position = silk_guard.center(player)
+	trigger_impact()
+	if resolve <= 0:
+		win_battle()
+	else:
+		respond_to_ground_hit()
+
 func update_bullets(dt):
 	for i in range(bullets.size() - 1, -1, -1):
 		var b = bullets[i]
 		var old: Vector2 = b.pos
 		b.pos += b.velocity * dt
 		b.life -= dt
+		if b.get("reflected", false):
+			var target: Vector2 = boss + Vector2(0, -55)
+			if Geometry2D.get_closest_point_to_segment(target, old, b.pos).distance_to(target) < 35:
+				bullets.remove_at(i)
+				if b.get("guard_damage", false):
+					_silk_counter_boss()
+				if phase != "battle":
+					return
+			elif b.life <= 0 or b.pos.x < -30 or b.pos.x > 990 or b.pos.y < -40 or b.pos.y > FLOOR_Y:
+				bullets.remove_at(i)
+			continue
+		if silk_guard.intercepts(old, b.pos, player):
+			b.pos = silk_guard.center(player)
+			b.reflected = true
+			b.guard_damage = silk_guard.claim_counter()
+			b.velocity = (boss + Vector2(0, -55) - b.pos).normalized() * maxf(b.velocity.length(), 280.0)
+			silk_guard.deflect()
+			combat_sounds.play("umbrella_hit")
+			continue
 		var body = player + Vector2(0, -30)
 		var tail = old - b.velocity.normalized() * b.get("length",44.0)
 		var closest = Geometry2D.get_closest_point_to_segment(body, tail, b.pos)
 		if closest.distance_to(body) < 19 and invulnerable <= 0:
 			bullets.remove_at(i)
-			damage_player()
+			damage_player(old)
 			if phase == "failed":
 				return
 		elif b.life <= 0 or b.pos.y > FLOOR_Y or b.pos.x < -30 or b.pos.x > 990 or b.pos.y < -40:
@@ -598,27 +905,44 @@ func win_battle():
 	boss.y = FLOOR_Y
 	boss_state = "rest"
 	start_dialogue([
-		"Grandmother: It's stopped.",
+		"Grandmother: ...Oh. It's stopped.",
 		"Xiaoyu: The spinning wheel?",
-		"Grandmother: The water.",
-		"Xiaoyu: There's only rain.",
-		"Grandmother: I know. I can hear the difference now.",
-		"Xiaoyu: You said someone was trying to boil you.",
-		"Grandmother: They did. A long time ago.",
-		"Grandmother: I was a silkworm, then. I made a cocoon.",
-		"Grandmother: I thought it was a waiting room for wings.",
-		"Xiaoyu: Did you ever get them?",
-		"Grandmother: No. Humans dropped the cocoon into boiling water.",
-		"Grandmother: They took the silk. I never saw the sky outside it.",
-		"(Xiaoyu can't find anything to say.)",
-		"Grandmother: You don't need to find the right words.",
-		"Xiaoyu: I don't know how to make it fair.",
-		"Grandmother: Neither do I. You listened anyway.",
-		"Grandmother: Please remember the others. They were waiting, too.",
-		"Xiaoyu: I will.",
-		"Grandmother: Can you hear the rain?",
-		"Xiaoyu: Yes.",
-		"Grandmother: I think it's finally doing its job.",
+		"Grandmother: The boiling, dear.",
+		"Xiaoyu: It's just rain now.",
+		"Grandmother: Hehe. So it is.",
+		"Xiaoyu: Grandma... what happened?",
+		"Grandmother: I used to be a silkworm.",
+		"Xiaoyu: A SILKWORM?!",
+		"Grandmother: What? Were you expecting a princess?",
+		"Xiaoyu: ...Maybe.",
+		"Grandmother: Ho ho!",
+		"Grandmother: I made myself a little cocoon.",
+		"Grandmother: I thought if I waited long enough, I'd grow wings and see the sky.",
+		"Grandmother: I dreamed I could fly wherever I pleased.",
+		"Xiaoyu: ...Did you?",
+		"Grandmother: No, dear.",
+		"Grandmother: Someone put my cocoon in boiling water.",
+		"Grandmother: They wanted the silk to make clothes.",
+		"Grandmother: I suppose they had no use for the wings.",
+		"Xiaoyu: ...That's not fair.",
+		"Grandmother: No. It wasn't.",
+		"Grandmother: But there were others, you know.",
+		"Grandmother: We were all waiting for our wings.",
+		"Grandmother: Will you remember us?",
+		"Xiaoyu: I promise.",
+		"Grandmother: Thank you, dear.",
+		"Grandmother: ...Oh, listen.",
+		"Xiaoyu: The rain?",
+		"Grandmother: It's cold.",
+		"Grandmother: How lovely.",
+		"Grandmother: Now, take this. The roads aren't safe at night.",
+		"Xiaoyu: Is this silk?",
+		"Grandmother: I wove it into your umbrella. Try opening it.",
+		SILK_LESSON,
+		"Xiaoyu: The rain bounced right off.",
+		"Grandmother: It can stop more than rain. But you still need to dodge.",
+		"Xiaoyu: Thank you, Grandma!",
+		"Grandmother: Ho ho! Off you go, little one!",
 	], "peace")
 
 func words(text: String, pos: Vector2, size: int = 16, color: Color = Color("d6dce8")):
@@ -641,6 +965,53 @@ func draw_actor(tex: Texture2D, foot: Vector2, height: float, flip: bool = false
 	draw_texture_rect(tex, Rect2(-width / 2, -height, width, height), false, tint)
 	world_transform(Vector2.ZERO)
 
+func is_grandmother_panicked() -> bool:
+	return after_dialogue == "battle" and panic_line_index >= 0 and line_index >= panic_line_index
+
+func draw_story_dialogue() -> void:
+	if story_portraits == null or dialogue.is_empty() or line_index >= dialogue.size():
+		return
+	var line: String = dialogue[line_index]
+	var aftermath: bool = after_dialogue == "peace" and resolve <= 0
+	# Keep the panic portraits through every line after the outburst, until combat.
+	var panic: bool = is_grandmother_panicked()
+	var girl_column: int = 1 if panic else 2 if aftermath else 0
+	var granny_column: int = 1 if panic else 2 if aftermath else 0
+	# The portraits replace the small in-world actors during conversation.
+	# Cells have alpha around the figures, leaving the live mountain and rain visible.
+	var cell := Vector2(512, 512)
+	var memory_column := -1
+	var memory_subject: Texture2D
+	if aftermath:
+		if line.contains("I used to be a silkworm"):
+			memory_subject = story_silkworm
+		elif line.contains("little cocoon"):
+			memory_subject = story_cocoon
+		if line.contains("boiling water") or line.contains("silk to make clothes"):
+			memory_column = 2
+	var free_flight: bool = aftermath and line.contains("I dreamed I could fly")
+	var sky_dream: bool = aftermath and line.contains("I'd grow wings and see the sky")
+	if memory_subject != null:
+		var size := memory_subject.get_size()
+		size *= 246.0 / maxf(size.x, size.y)
+		draw_texture_rect(memory_subject, Rect2(Vector2(480, 210) - size / 2, size), false)
+	elif free_flight and story_free_moth != null:
+		var drift := Vector2(sin(clock_time * 1.4) * 5.0, -sin(clock_time * 1.1) * 5.0)
+		draw_texture_rect(story_free_moth, Rect2(Vector2(351, 73) + drift, Vector2(260, 260)), false, Color(1, 1, 1, .87))
+	elif sky_dream and story_sky_dream != null:
+		draw_texture_rect(story_sky_dream, Rect2(346, 80, 270, 270), false, Color(1, 1, 1, .86))
+	elif memory_column >= 0 and story_memories != null:
+		var memory_cell := story_memories.get_size().x / 3.0
+		draw_texture_rect_region(story_memories, Rect2(323, 103, 315, 246), Rect2(memory_column * memory_cell, 0, memory_cell, story_memories.get_size().y), Color(1, 1, 1, .82))
+	# Square atlas cells must use square destinations: independent width/height
+	# scaling stretched the figures. Anchor both portraits to the bottom corners.
+	draw_texture_rect_region(story_portraits, Rect2(-30, 260, 260, 260), Rect2(girl_column * cell.x, 0, cell.x, cell.y))
+	if panic and story_panic != null:
+		var panic_size := story_panic.get_size() * (260.0 / story_panic.get_height())
+		draw_texture_rect(story_panic, Rect2(Vector2(850, 520) - Vector2(panic_size.x / 2.0, panic_size.y), panic_size), false)
+	else:
+		draw_texture_rect_region(story_portraits, Rect2(720, 260, 260, 260), Rect2(granny_column * cell.x, cell.y, cell.x, cell.y))
+
 func _draw():
 	var strength: float = pow(shake_time / 0.18, 2) if not reduce_shake else 0.0
 	world_offset = Vector2(sin(feedback_clock*95)*3.0,cos(feedback_clock*113)*1.7)*strength
@@ -652,6 +1023,11 @@ func _draw():
 	draw_texture_rect_region(background, Rect2(0, 0, 960, FLOOR_Y), Rect2(0, 0, source_size.x, source_floor))
 	draw_texture_rect_region(background, Rect2(0, FLOOR_Y, 960, 540 - FLOOR_Y), Rect2(0, source_floor, source_size.x, source_size.y - source_floor))
 	weather.draw(self)
+	if inventory.opened:
+		return
+	if phase == "dialogue" and not paused and not memory_open:
+		draw_story_dialogue()
+		return
 	if granny == null or frames.is_empty():
 		return
 	spinning.draw_equipment(self)
@@ -665,7 +1041,7 @@ func _draw():
 	if phase == "battle":
 		if boss_state in ["cast","diagonal_cast","volley","release"]:
 			pose = 1
-		elif boss_state in ["wrap","rise","dash_prepare","dive_prepare"]:
+		elif boss_state in ["sidestep","wrap","rise","dash_prepare","dive_prepare"]:
 			pose = 3
 		elif boss_state in ["air_charge","air_fire"]:
 			pose = 2
@@ -683,14 +1059,17 @@ func _draw():
 		tint.a = 0.0
 	if not flight.is_empty():
 		var texture: Texture2D = ascent_frames[flight.index] if flight.kind == "ascent" else landing_frames[flight.index]
-		draw_texture_rect(texture, Rect2(Vector2(-128,-240),Vector2(256,300)),false,tint)
+		var bounds: Rect2 = ASCENT_BOUNDS[flight.index] if flight.kind == "ascent" else LANDING_BOUNDS[flight.index]
+		var height: float = ASCENT_HEIGHTS[flight.index] if flight.kind == "ascent" else LANDING_HEIGHTS[flight.index]
+		var width: float = height * bounds.size.x / bounds.size.y
+		draw_texture_rect_region(texture, Rect2(-width * .5, -height, width, height), bounds, tint)
 	else:
 		draw_texture_rect(boss_frames[pose], Rect2(Vector2(-floorf(size.x/2),-size.y), size), false, tint)
 	world_transform(Vector2.ZERO)
 	if phase == "battle" and boss_state in ["cast","diagonal_cast","volley"]:
 		var hand = boss + Vector2(boss_direction * 55, -34)
 		if boss_state == "diagonal_cast":
-			hand = boss + Vector2(boss_direction * 55, -78)
+			hand = aimed_silk_origin()
 			for offset in [-0.32, 0.0, 0.32]:
 				var aim: Vector2 = (silk_aim - hand).normalized().rotated(offset)
 				draw_line(hand, hand + aim * 100, Color(1,0.94,0.8,0.3), 1,true)
@@ -705,10 +1084,6 @@ func _draw():
 				draw_line(boss + Vector2(0, -55) + dir * 65, boss + Vector2(0, -55) + dir * 98, Color(0.95, 0.93, 0.82, 0.35 + boss_time*0.3), 1,true)
 	if phase == "battle" and boss_state == "dash_prepare":
 		draw_line(boss+Vector2(0,-4),boss+Vector2(boss_direction*200,-4),Color(1,0.9,0.7,0.3),2,true)
-	if phase == "battle" and boss_state in ["dive_prepare","dive"]:
-		draw_arc(boss_target,27,PI,TAU,16,Color(1,0.9,0.7,0.5),1,true)
-	if impact_time > 0:
-		draw_arc(boss,25+(0.4-impact_time)*110,PI,TAU,20,Color(0.9,0.9,1,impact_time),2,true)
 	draw_hero()
 	for bullet in bullets:
 		draw_silk_bundle(bullet)
@@ -858,9 +1233,11 @@ func draw_hero():
 		pose = 5 if attack_up else 4
 		if attack > 0.28 or attack < 0.06:
 			pose = 0
+	if silk_guard.active():
+		pose = 4
 	var direction: int = attack_facing if attack > 0 else facing
 	var tint := Color.WHITE
-	if invulnerable > 0 and int(clock_time * 14) % 2 == 0:
+	if phase == "battle" and invulnerable > 0 and int(clock_time * 14) % 2 == 0:
 		tint.a = 0.45
 	# Shared scale keeps the head size stable; pose silhouettes can change height.
 	# Pixel poses are already at the shared 65/442 scale; draw 1:1 on whole pixels.
@@ -872,12 +1249,13 @@ func draw_hero():
 	world_transform(Vector2.ZERO)
 	walk.draw_shadow(self, player, FLOOR_Y)
 	world_transform(player+body_offset, lean, Vector2(direction, 1))
-	if pose == 0 and attack <= 0 and walk.walking and moving:
-		walk.draw_body(self, frames[0], tint)
-	else:
-		draw_texture_rect(frames[pose], Rect2(Vector2(-floorf(size.x/2), -size.y), size), false, tint)
+	if not silk_guard.presenting():
+		if pose == 0 and attack <= 0 and walk.walking and moving:
+			walk.draw_body(self, frames[0], tint)
+		else:
+			draw_texture_rect(frames[pose], Rect2(Vector2(-floorf(size.x/2), -size.y), size), false, tint)
 	world_transform(Vector2.ZERO)
-	if equipped:
+	if equipped and not silk_guard.presenting():
 		var walking_pose: bool = pose == 0 and attack <= 0 and walk.walking and moving
 		var grip: Vector2 = walk.carry_grip() if walking_pose else Vector2(-2,-24)
 		var angle := 0.18 if walking_pose else 0.38
@@ -908,7 +1286,14 @@ func draw_hero():
 			for i in 3:
 				var side := aim.orthogonal() * (i-1)*3
 				draw_line(pivot+aim*25+side,pivot+aim*47+side,Color(0.6,0.94,1,0.45),1.1,true)
-	if hit_feedback > 0:
+	silk_guard.draw(self, player)
+	if phase == "silk_reveal":
+		for i in range(4):
+			var t := (.95 - lesson_reveal - .18 - i * .035) / .38
+			if t >= 0.0 and t < 1.0:
+				var offset := Vector2(facing * (51.0 + t * 30.0), -50.0 + i * 7.0 - sin(t * PI) * 9.0)
+				draw_line(player + offset, player + offset + Vector2(facing * 3.0, -2.0), Color(.8, .94, 1, 1 - t), 1.5)
+	if phase == "battle" and hit_feedback > 0:
 		var t: float = 1.0 - hit_feedback/0.35
 		if t < 0.22:
 			draw_line(hit_position-Vector2(10,0),hit_position+Vector2(10,0),Color(0.9,1,1),3,true)

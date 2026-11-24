@@ -42,10 +42,6 @@ func run() -> void:
 		push_error("Use isolated APPDATA / LOCALAPPDATA and set TALES_TEST_RUN=1 before running this test.")
 		quit(2)
 		return
-	if OS.get_environment("TALES_TEST_RUN") != "1":
-		push_error("Use isolated APPDATA / LOCALAPPDATA and set TALES_TEST_RUN=1 before running this test.")
-		quit(2)
-		return
 	create_timer(35).timeout.connect(func() -> void: quit(2))
 	DirAccess.make_dir_recursive_absolute("res://art_review/english_menu")
 	root.size = Vector2i(960, 540)

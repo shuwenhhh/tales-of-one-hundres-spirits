@@ -5,7 +5,7 @@ Built-in ImageGen edit of the user's selected diagonal-print concept.
 Characters: only Xiaoyu. Large vermilion/navy umbrella, landscape print panels,
 moonlit mountains, lantern village, peach blossoms and navy/ivory wave motifs.
 The left area is dark navy, with all title/menu text removed from the bitmap.
-The previous fox_spirit_menu.png is retained as an earlier version.
+The superseded fox-mask menu was removed during unused-asset cleanup.
 
 Edit prompt:
 Remove all title text, five menu labels and gold selection mark from the left

@@ -1,4 +1,0 @@
-fox_spirit_menu.png
-Approved fox-mask giant spirit and Xiaoyu illustration, with baked-in Chinese typography removed using built-in image_gen. The game draws all English title text and interactive controls separately.
-Source concept: art_review/title_concepts_20261110/08_fox_mask_listener.png
-Edit prompt: Preserve the approved illustration and composition. Remove all left-side title, subtitle, menu text and selection dash, restoring uninterrupted dark navy painted background. No new lettering. Keep the spirit, girl, wisteria, robes, moon, lantern and scenery unchanged.

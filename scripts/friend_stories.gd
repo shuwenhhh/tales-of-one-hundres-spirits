@@ -37,6 +37,14 @@ const ENTRIES := [
 		"intro": "On a rainy mountain road, a man in a white fox mask tells Xiaoyu to stop. A red thread has drifted to her shoes.",
 		"summary": "Xiaoyu only wanted shelter. Qingyan tried to keep her beyond the wedding's boundary. The foxfire has fallen quiet, but the red thread still leads onward.",
 		"story": "Xiaoyu followed a red lantern while looking for shelter. Qingyan stood in the road, wearing a white fox mask and a length of red thread around his wrist. He warned her that she had wandered somewhere unsafe.\n\nRain carried a thread to her shoes. Qingyan called it a threshold, though even he thought it was rather thin. He did not attack because she had spoken out of turn: he was trying to push her out before the ceremony drew her farther in.\n\nXiaoyu raised her umbrella against the thread and the foxfire. When the flames fell quiet, the mountain road and its strange wedding remained. This encounter records the beginning of Qingyan's story; the promises behind his mask are still waiting to be understood."
+	},
+	{
+		"scene": "res://chapter4.tscn", "name": "Faceless Spirit", "chapter": "BORROWED SMILES",
+		"background": preload("res://assets/chapter4/rain_market.png"),
+		"portrait": preload("res://assets/chapter4/paper_stand.png"), "role": "A spirit with a borrowed smile",
+		"intro": "A small spirit greets each stranger with a different face.",
+		"summary": "A lollipop brought back the taste of a summer shared with friends.",
+		"story": "The spirit practiced every smile until it forgot what it liked. After the fight Xiaoyu bumped into it. It was still choosing an angry face when she offered it a lollipop. The sweetness recalled a summer with friends who already loved it. This time the smile came by itself."
 	}
 ]
 

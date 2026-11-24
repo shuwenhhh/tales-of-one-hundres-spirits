@@ -11,6 +11,15 @@ func check(condition: bool, message: String) -> void:
 func _initialize() -> void:
 	call_deferred("run")
 
+func direction_keys(direction: int) -> void:
+	for code in [KEY_A, KEY_D]:
+		var event := InputEventKey.new()
+		event.physical_keycode = code
+		event.keycode = code
+		event.pressed = (direction < 0 and code == KEY_A) or (direction > 0 and code == KEY_D)
+		Input.parse_input_event(event)
+	Input.flush_buffered_events()
+
 func run() -> void:
 	game = load("res://chapter1.tscn").instantiate()
 	game.test_mode = true
@@ -48,6 +57,32 @@ func run() -> void:
 	game.player = Vector2(600, game.FLOOR_Y)
 	game.resolve_body_overlap(game.player, game.boss)
 	check(game.player.x == 600, "airborne boss does not block movement underneath")
+	for direction in [-1, 1]:
+		for fps in [30, 60, 144]:
+			game.retry()
+			game.boss_state = "recover"
+			game.recovery_duration = 3.0
+			game.player = Vector2(30 if direction == 1 else 930, game.FLOOR_Y)
+			game.boss = game.player + Vector2(direction * game.BODY_GAP, 0)
+			game.boss_origin = game.boss
+			game.boss_target = game.boss
+			game.facing = -direction
+			game.invulnerable = 0
+			direction_keys(direction)
+			var shift := InputEventKey.new()
+			shift.physical_keycode = KEY_SHIFT
+			shift.pressed = true
+			game._unhandled_key_input(shift)
+			check(game.facing == direction, "turning and Shift together uses the requested escape direction")
+			for frame in range(int(ceil(.25 * fps))):
+				game._physics_process(1.0 / fps)
+			direction_keys(0)
+			check((game.player.x - game.boss.x) * direction >= game.BODY_GAP and game.hp == 6, "Shift escapes corner through grandmother at %d fps, direction %d" % [fps, direction])
+			check(game.player.x >= 30 and game.player.x <= 930 and game.dash_cd > 0, "phase dash retains level bounds and cooldown")
+			# Body blocking resumes on the side that was reached, not the old side.
+			game.player.x = game.boss.x + direction * 10
+			game.resolve_body_overlap(game.player, game.boss)
+			check((game.player.x - game.boss.x) * direction >= game.BODY_GAP, "ordinary blocking resumes after phase dash")
 	game.retry()
 	game.phase = "battle"
 	game.invulnerable = 0

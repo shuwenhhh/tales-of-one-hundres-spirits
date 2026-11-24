@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="60" height="50" viewBox="0 0 60 50" shape-rendering="crispEdges">
+<path fill="#312a3d" d="M19 3h20v2h6v4h4v5h3v6h3v5h3v7h-5v9h-4v4h-4v4h-8v-3H21v3h-8v-4H9v-4H6v-9H2v-7h3v-6h3v-6h4V8h4V5h3z"/>
+<path fill="#73778d" d="M19 6h21v3h5v6h4v7h3v5h3v3h-6v-3h-3v9h4v5h-6v3H16v-2h-5v-5h2V26H9v4H5v-5h3v-6h4v-6h4V8h3z"/>
+<path fill="#53586c" d="M12 37h5v3h27v-3h5v4h-5v3H16v-2h-5z"/>
+<path fill="#f8e2bc" d="M21 7h16v2h5v3h3v9h-3v4h-6v2H23v-2h-6v-3h-3v-8h3v-4h4z"/>
+<path fill="#93ad9d" d="M12 24h5v3h7v2h13v-2h6v-3h4v5h-5v3H20v-2h-7z"/>
+<path fill="#343044" d="M10 30h8v2h2v5h-8v-2h-2z M40 32h2v-2h7v6h-3v2h-6z"/>
+<path fill="#898a9c" d="M12 32h5v3h-5z M42 32h5v3h-5z"/>
+<path fill="#342638" d="M18 17h2v-2h4v2h2v2h-2v-2h-4v2h-2z M32 17h2v-2h4v2h2v2h-2v-2h-4v2h-2z M25 21h8v4h-2v2h-4v-2h-2z"/></svg>

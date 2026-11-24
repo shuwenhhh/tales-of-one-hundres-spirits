@@ -1,0 +1,52 @@
+extends SceneTree
+const OUT := "res://assets/chapter2/vine/"
+const INK := Color("494451")
+const DARK := Color("62636a")
+const GREEN := Color("858878")
+const LIGHT := Color("a8aa93")
+func _initialize() -> void:
+	DirAccess.make_dir_recursive_absolute(OUT)
+	var core := Image.create(32, 6, false, Image.FORMAT_RGBA8)
+	core.fill(INK)
+	core.fill_rect(Rect2i(0, 1, 32, 3), GREEN)
+	core.fill_rect(Rect2i(0, 4, 32, 1), DARK)
+	for px in [2, 3, 4, 12, 13, 22, 23, 24]:
+		core.set_pixel(px, 1, LIGHT)
+	core.set_pixel(18, 3, DARK)
+	core.set_pixel(19, 4, GREEN)
+	core.save_png(OUT + "vine_core.png")
+	var leaf := Image.create(14, 10, false, Image.FORMAT_RGBA8)
+	leaf.fill(Color.TRANSPARENT)
+	poly(leaf, [Vector2(0,9),Vector2(4,3),Vector2(13,0),Vector2(11,6),Vector2(5,9)], INK)
+	poly(leaf, [Vector2(3,8),Vector2(5,4),Vector2(11,2),Vector2(9,6),Vector2(5,8)], GREEN)
+	poly(leaf, [Vector2(4,7),Vector2(7,4),Vector2(11,2),Vector2(7,6)], LIGHT)
+	leaf.save_png(OUT + "vine_sprig_a.png")
+	var small := leaf.duplicate()
+	small.resize(10, 7, Image.INTERPOLATE_NEAREST)
+	small.save_png(OUT + "vine_sprig_b.png")
+	var bud := Image.create(10,6,false,Image.FORMAT_RGBA8)
+	bud.fill(Color.TRANSPARENT)
+	poly(bud,[Vector2(0,2),Vector2(4,0),Vector2(10,3),Vector2(4,6),Vector2(0,4)],INK)
+	poly(bud,[Vector2(2,2),Vector2(4,1),Vector2(8,3),Vector2(4,5),Vector2(2,4)],Color("a28bbc"))
+	bud.set_pixel(4,2,Color("e0d2ee"))
+	bud.save_png(OUT + "vine_tip.png")
+	var flower := Image.create(7,15,false,Image.FORMAT_RGBA8)
+	flower.fill(Color.TRANSPARENT)
+	flower.fill_rect(Rect2i(3,0,1,14),DARK)
+	for p in [Vector2i(0,2),Vector2i(3,4),Vector2i(1,7),Vector2i(3,9),Vector2i(2,12)]:
+		flower.fill_rect(Rect2i(p,Vector2i(3,3)),Color("655279"))
+		flower.fill_rect(Rect2i(p,Vector2i(2,2)),Color("b399d1"))
+		flower.set_pixel(p.x,p.y,Color("e4d7f0"))
+	flower.save_png(OUT + "vine_flower.png")
+	var collar := Image.create(12,10,false,Image.FORMAT_RGBA8)
+	collar.fill(Color.TRANSPARENT)
+	poly(collar,[Vector2(0,4),Vector2(8,0),Vector2(12,2),Vector2(8,6),Vector2(11,9),Vector2(3,9)],INK)
+	poly(collar,[Vector2(2,4),Vector2(8,2),Vector2(10,2),Vector2(6,5),Vector2(8,8),Vector2(4,7)],GREEN)
+	collar.save_png(OUT + "vine_root.png")
+	print("Organic vine pixel assets generated")
+	quit()
+func poly(image:Image, points:Array, color:Color) -> void:
+	for py in image.get_height():
+		for px in image.get_width():
+			if Geometry2D.is_point_in_polygon(Vector2(px+0.5,py+0.5),PackedVector2Array(points)):
+				image.set_pixel(px,py,color)

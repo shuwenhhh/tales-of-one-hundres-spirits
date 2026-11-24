@@ -7,7 +7,7 @@ silk_shot: short fiber snap and airy trailing swish; 230 ms.
 silk_burst: one layered fan-shaped release for the eight-way volley; 480 ms.
 umbrella_swing: dry cloth/wood movement through air; 190 ms.
 umbrella_hit_crisp_v2: bright dry crack, 0.25 ms attack, reduced low/mid weight;
-110 ms. Current impact sound. The old umbrella_hit.wav is retained for reference.
+110 ms. Current impact sound. The superseded umbrella_hit.wav was removed.
 
 Runtime levels and playback live in scripts/combat_sounds.gd.
 Only confirmed hits play umbrella_hit; misses play umbrella_swing alone.

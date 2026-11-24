@@ -49,10 +49,13 @@ func run() -> void:
 			check(game.rain[0] == game.weather.drops[0] and game.rain[0].y > 100, "rain continues during hit-stop without double physics stepping")
 		else:
 			game.x = 570
-			game.freeze_time = 1.0
+			game.hp = 6
+			game.invincible = 0.0
+			game.battle_elapsed = 2.0
+			game.damage_player(true)
 			game.weather.drops[0] = Vector2(400, 100)
 			game._process(.1)
-			check(game.weather.drops[0].y > 100 and game.freeze_time == 1.0, "petal stun does not stop the rain")
+			check(game.weather.drops[0].y > 100 and game.hp == 5, "blossom damage does not stop the ambient rain")
 		if DisplayServer.get_name() != "headless":
 			for frame in range(2):
 				game._process(.12)

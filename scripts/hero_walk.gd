@@ -58,13 +58,6 @@ func advance(displacement: float, grounded: bool) -> void:
 	else:
 		stop_audio()
 
-static func foot_at(cycle: float) -> Vector2:
-	var t := fposmod(cycle, 1.0)
-	if t < 0.5:
-		return Vector2(STRIDE * (0.25 - t), 0.0)
-	var swing := (t - 0.5) * 2.0
-	return Vector2(lerpf(-STRIDE * 0.25, STRIDE * 0.25, swing), -sin(swing * PI) * 7.0)
-
 func frame_index() -> int:
 	return int(floor(distance / STRIDE * 8.0)) % 8
 

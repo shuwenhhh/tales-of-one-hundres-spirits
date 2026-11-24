@@ -65,6 +65,8 @@ func run() -> void:
 	second.set_physics_process(false)
 	second.combat_sounds.cue_played.connect(heard)
 	second.phase = "battle"
+	second.battle_elapsed = second.OPENING_GRACE
+	second.boss_state = "ouch"
 	second.x = 600
 	second.boss_x = 660
 	second.facing = 1
