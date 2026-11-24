@@ -29,6 +29,7 @@ var elapsed := 0.0
 var x := 125.0
 var facing := 1
 var spirit_x := 0.0
+var hop_phase := 0.0
 var line := 0
 const END_LINES: Array[String] = [
 	"伞妖：嗒，嗒，嗒！一滴都没漏！我还记得这个声音！",
@@ -96,6 +97,13 @@ func next_line() -> void:
 			JOURNEY.complete_chapter(scene_file_path, END_LINES)
 
 func _physics_process(delta: float) -> void:
+	if phase == Phase.TALKING or phase >= Phase.REJOICE:
+		var beat := 0.65
+		if phase == Phase.REJOICE:
+			beat = 0.42
+		elif phase == Phase.FINISHED and absf(spirit_x - (x - facing * 44)) > 5:
+			beat = 0.48
+		hop_phase = fposmod(hop_phase + delta / beat, 1.0)
 	if phase not in [Phase.WAITING, Phase.RAIN, Phase.FINISHED]:
 		return
 	var left := Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT)
@@ -109,7 +117,8 @@ func _physics_process(delta: float) -> void:
 	x = clampf(x + speed * delta, 20, 940)
 	walk.advance(x - old_x, true)
 	if phase == Phase.FINISHED:
-		spirit_x = move_toward(spirit_x, x - facing * 44, 180 * delta)
+		if hop_phase < 0.78:
+			spirit_x = move_toward(spirit_x, clampf(x - facing * 44, 20, 940), 250 * delta)
 	if phase == Phase.FINISHED and x >= 936 and not leaving:
 		leaving = TRANSITION.start(get_tree(), "res://scenes/chapter_intro.tscn") == OK
 	if phase == Phase.RAIN:
@@ -196,8 +205,13 @@ func _draw() -> void:
 			draw_spirit(foot, t)
 		draw_texture_rect_region(CHEST, Rect2(BOX.position + Vector2(0, 17), Vector2(103, 48)), Rect2(0, 30, 179, 84))
 		if phase == Phase.TALKING or phase >= Phase.REJOICE:
-			var hop := 22 * absf(sin(2 * PI * elapsed)) if phase == Phase.REJOICE else 0.0
-			draw_spirit(Vector2(spirit_x, FLOOR_Y - hop), 1)
+			var air := minf(hop_phase / 0.78, 1.0)
+			var arc := 4.0 * air * (1.0 - air)
+			var height := 25.0 if phase == Phase.REJOICE else (16.0 if walk.walking else 8.0)
+			var foot := Vector2(spirit_x, FLOOR_Y - arc * height)
+			var squash := sin(PI * clampf((hop_phase - 0.78) / 0.22, 0, 1))
+			walk.draw_shadow(self, foot, FLOOR_Y)
+			draw_spirit(foot, 1, 1.0 + 0.045 * arc - 0.09 * squash)
 	walk.draw_shadow(self, Vector2(x, FLOOR_Y), FLOOR_Y)
 	draw_set_transform(Vector2(roundf(x), FLOOR_Y), 0, Vector2(facing, 1))
 	if walk.walking:
@@ -215,9 +229,9 @@ func _draw() -> void:
 			hint = "点击晃动的木箱"
 		draw_string(FONT, Vector2(0, 507), hint, HORIZONTAL_ALIGNMENT_CENTER, 960, 16, Color("efdfc6"))
 
-func draw_spirit(foot: Vector2, progress: float) -> void:
+func draw_spirit(foot: Vector2, progress: float, stretch: float = 1.0) -> void:
 	var emerging := smoothstep(0, 0.18, progress)
-	draw_set_transform(foot, 0, Vector2(1 if spirit_x >= x else -1, 1))
+	draw_set_transform(foot, 0, Vector2((1 if spirit_x >= x else -1) / stretch, stretch))
 	draw_texture_rect(SPIRIT, Rect2(-26, -62 * emerging, 52, 62 * emerging), false)
 	draw_set_transform(Vector2.ZERO)
 
