@@ -9,6 +9,18 @@ umbrella_swing: dry cloth/wood movement through air; 190 ms.
 umbrella_hit_crisp_v2: bright dry crack, 0.25 ms attack, reduced low/mid weight;
 110 ms. Current impact sound. The old umbrella_hit.wav is retained for reference.
 
+Second generator: tools/synthesize_impact_audio.py (same method, added 2026-11-25).
+umbrella_hit_heavy_v3: current impact sound. Crisp crack kept on top, with a
+second crunch transient, a woody knock, a low thump and a bright rising
+"shing" tail; heavily saturated; 340 ms.
+umbrella_hit_crisp_v2 is retained for reference.
+umbrella_block: strike stopped by the Peach Spirit's guard; hard clack with a
+bright ringing rebound and no low end; 340 ms.
+boss_swing: heavy branch sweep; 320 ms.
+boss_lunge: rising rush for thrusts, dashes and dives; 300 ms.
+boss_slam: landing thud after a dive or leap; 420 ms.
+petal_gust: airy swell when the blossom storm is released; 1.1 s.
+
 Runtime levels and playback live in scripts/combat_sounds.gd.
 Only confirmed hits play umbrella_hit; misses play umbrella_swing alone.
 Hit-stop does not interrupt the impact sound. Pausing stops combat audio.

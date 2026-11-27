@@ -3,13 +3,14 @@ extends RefCounted
 signal cue_played(cue: StringName)
 
 var players: Dictionary = {}
-const LEVELS := {"silk_charge": -12.0, "silk_shot": -8.0, "silk_burst": -8.0, "umbrella_swing": -9.0, "umbrella_hit": -5.0}
+const LEVELS := {"silk_charge": -12.0, "silk_shot": -8.0, "silk_burst": -8.0, "umbrella_swing": -9.0, "umbrella_hit": -2.0,
+	"umbrella_block": -3.0, "umbrella_open": -9.0, "boss_swing": -7.0, "boss_lunge": -7.0, "boss_slam": -5.0, "petal_gust": -9.0}
 
 func setup(owner_node: Node) -> void:
 	for cue: String in LEVELS:
 		var player := AudioStreamPlayer.new()
 		player.name = cue.to_pascal_case()
-		var filename: String = "umbrella_hit_crisp_v2" if cue == "umbrella_hit" else cue
+		var filename: String = "umbrella_hit_heavy_v3" if cue == "umbrella_hit" else cue
 		player.stream = load("res://assets/audio/combat/" + filename + ".wav")
 		player.volume_db = LEVELS[cue]
 		player.max_polyphony = 2 if cue == "silk_shot" else 1

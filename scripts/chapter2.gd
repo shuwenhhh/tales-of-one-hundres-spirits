@@ -62,6 +62,31 @@ var after_lines := "battle"
 var attack_time := 0.0
 var attack_cooldown := 0.0
 var hit_this_swing := false
+const BOSS_FLASH_TIME := 0.42
+var boss_flash := 0.0
+var hit_fx = preload("res://scripts/hit_spark.gd").new()
+const BLOOM := preload("res://scripts/bloom_burst.gd")
+var bloom = BLOOM.new()
+const FX_LAYER := preload("res://scripts/fx_layer.gd")
+var fx_layer = FX_LAYER.new()
+var juice = preload("res://scripts/impact_juice.gd").new()
+var cotton = preload("res://scripts/cotton_burst.gd").new()
+var hit_stop := 0.0
+var reduce_shake := false
+# Holding L / S / Down opens the umbrella as a shield against the boss in front
+# and petals from above. Opening it just before the hit lands is a perfect guard.
+const CANOPY := preload("res://assets/chapter0/encounter/sky_canopy.png")
+const PERFECT_GUARD := 0.2
+const GUARD_FLASH_TIME := 0.2
+var guarding := false
+var guard_time := 0.0
+var guard_flash := 0.0
+var motion = preload("res://scripts/actor_motion.gd").new()
+var boss_flash_layer = preload("res://scripts/flash_layer.gd").new()
+var boss_silhouette: Array = []
+# Floating damage numbers: {"at": Vector2, "text": String, "age": float}
+const POPUP_TIME := 0.7
+var popups: Array[Dictionary] = []
 var dash_time := 0.0
 var dash_cooldown := 0.0
 var invincible := 0.0
@@ -100,6 +125,7 @@ func _ready() -> void:
 	if not test_mode:
 		JOURNEY.remember_chapter("res://chapter2.tscn")
 		JOURNEY.apply_preferences()
+		reduce_shake = bool(JOURNEY.preferences().get_value("settings", "reduce_shake", false))
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	var backdrop := Sprite2D.new()
 	backdrop.texture = GARDEN
@@ -116,6 +142,10 @@ func _ready() -> void:
 	weather.reset(Vector2(960, 540))
 	walk.setup_audio(self)
 	combat_sounds.setup(self)
+	boss_flash_layer.painter = draw_boss_silhouette
+	add_child(boss_flash_layer)
+	fx_layer.painter = draw_fx
+	add_child(fx_layer)
 	dialogue_box.mount(self)
 	for i in 6:
 		girl.append(load("res://assets/chapter1/pixel/girl/pose_%d.png" % i))
@@ -192,7 +222,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		dash_time = 0.18
 		dash_cooldown = 0.9
 		invincible = maxf(invincible, 0.25)
-	if key == KEY_J and attack_cooldown <= 0.0 and phase in ["battle", "explore", "peace"]:
+	if key == KEY_J and not guarding and attack_cooldown <= 0.0 and phase in ["battle", "explore", "peace"]:
 		attack_time = 0.31
 		attack_cooldown = 0.43
 		hit_this_swing = false
@@ -243,6 +273,21 @@ func begin_battle() -> void:
 
 func _process(delta: float) -> void:
 	weather.advance(delta)
+	if not paused:
+		hit_fx.advance(delta)
+		bloom.advance(delta)
+		cotton.advance(delta)
+		juice.advance(delta)
+		guard_flash = maxf(0.0, guard_flash - delta)
+		for i in range(popups.size() - 1, -1, -1):
+			popups[i].age += delta
+			if popups[i].age >= POPUP_TIME:
+				popups.remove_at(i)
+		var moved: String = motion.advance(delta, Vector2(roundf(x), roundf(y)), facing, y < FLOOR - 0.1, dash_time > 0.0)
+		if moved != "":
+			cotton.dust(Vector2(x, FLOOR), -facing if moved == "dash" else 0.0)
+		boss_flash = maxf(0.0, boss_flash - delta)
+	juice.apply(self, reduce_shake)
 	queue_redraw()
 	dialogue_box.visible = phase == "dialogue" and not paused
 	if dialogue_box.visible and dialogue_box.advance_time(delta, Input.is_physical_key_pressed(KEY_CTRL)):
@@ -253,6 +298,10 @@ func _physics_process(delta: float) -> void:
 		queue_redraw()
 		walk.stop_audio()
 		combat_sounds.stop_all()
+		return
+	if hit_stop > 0.0:
+		# Freeze the fight for a few frames so each blow lands with weight.
+		hit_stop = maxf(0.0, hit_stop - delta)
 		return
 	flower_bob += delta
 	if phase == "settling":
@@ -273,6 +322,15 @@ func _physics_process(delta: float) -> void:
 		return
 	var previous_x := x
 	freeze_time = maxf(0.0, freeze_time - delta)
+	var wants_guard := phase in ["battle", "explore", "peace"] and y >= FLOOR - 0.1 and attack_time <= 0.0 and dash_time <= 0.0 and freeze_time <= 0.0 and knockback_time <= 0.0 and (
+		Input.is_physical_key_pressed(KEY_L) or Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN))
+	if wants_guard and not guarding:
+		guard_time = 0.0
+		motion.kick(Vector2(1.12, 0.88))
+		combat_sounds.play("umbrella_open")
+	guarding = wants_guard
+	if guarding:
+		guard_time += delta
 	if phase not in ["dialogue", "failed"] and freeze_time <= 0.0:
 		if knockback_time > 0.0:
 			x = clampf(x + knockback_velocity * delta, 32.0, 925.0)
@@ -281,7 +339,8 @@ func _physics_process(delta: float) -> void:
 			var direction := int(Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT)) - int(Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT))
 			if direction != 0:
 				facing = direction
-			x = clampf(x + direction * (410.0 if dash_time > 0 else WALK_SPEED) * delta, 32.0, 925.0)
+			if not guarding:
+				x = clampf(x + direction * (410.0 if dash_time > 0 else WALK_SPEED) * delta, 32.0, 925.0)
 		vy = minf(vy + 950.0 * delta, 600.0)
 		y = minf(FLOOR, y + vy * delta)
 		if y >= FLOOR:
@@ -291,6 +350,9 @@ func _physics_process(delta: float) -> void:
 	if attack_time > 0.0 and attack_time <= 0.25 and not swing_played:
 		swing_played = true
 		combat_sounds.play("umbrella_swing")
+		hit_fx.swing(Vector2(x + facing * 14.0, y - 40.0), facing, false, motion.swings)
+		motion.swings += 1
+		motion.kick(Vector2(1.16, 0.9))
 	var dash_active := dash_time > 0.0
 	dash_time = maxf(0.0, dash_time - delta)
 	dash_cooldown = maxf(0.0, dash_cooldown - delta)
@@ -310,6 +372,10 @@ func _physics_process(delta: float) -> void:
 func apply_boss_hit() -> void:
 	hit_this_swing = true
 	if boss_state == "parry":
+		combat_sounds.play("umbrella_block")
+		hit_fx.burst(Vector2(lerpf(x, boss_x, 0.72), y - 44.0), facing, false, true)
+		hit_stop = 0.07
+		juice.punch(Vector2(lerpf(x, boss_x, 0.72), y - 44.0), 0.8)
 		boss_state = "counter_prepare"
 		boss_time = 0.0
 		warning_played = false
@@ -317,6 +383,15 @@ func apply_boss_hit() -> void:
 		return
 	grief -= 1
 	combat_sounds.play("umbrella_hit")
+	boss_flash = BOSS_FLASH_TIME
+	popups.append({"at": Vector2(boss_x + randf_range(-18.0, 18.0), FLOOR - 165.0 + boss_air_y), "text": "-1", "age": 0.0})
+	hit_fx.burst(Vector2(lerpf(x, boss_x, 0.72), y - 44.0 + boss_air_y), facing, grief <= 0)
+	bloom.burst(Vector2(boss_x, y - 60.0 + boss_air_y), BLOOM.PEACH, 36 if grief <= 0 else 14, 360.0, Vector2(facing, -0.5))
+	hit_stop = 0.2 if grief <= 0 else 0.09
+	juice.punch(Vector2(lerpf(x, boss_x, 0.72), y - 44.0 + boss_air_y), 1.6 if grief <= 0 else 1.0)
+	# Blossom clouds burst open in the scenery behind her.
+	cotton.burst(Vector2(lerpf(x, boss_x, 0.72) + facing * 10.0, y - 44.0 + boss_air_y), 58.0 if grief <= 0 else 34.0, cotton.BLOSSOM)
+	cotton.scatter(Vector2(boss_x + facing * 20.0, FLOOR - 70.0 + boss_air_y), 6 if grief <= 0 else 2, Vector2(46, 50), 24.0, cotton.BLOSSOM)
 	boss_air_y = 0.0
 	if grief <= 0:
 		if not test_mode:
@@ -409,6 +484,8 @@ func update_boss(delta: float) -> void:
 			combat_sounds.play("silk_charge")
 		if boss_time >= windup:
 			boss_state = "branch_swing" if branch_mode == "sweep" else "branch_lunge"
+			combat_sounds.play("boss_swing" if branch_mode == "sweep" else "boss_lunge")
+			bloom.burst(Vector2(boss_x + boss_facing * 48.0, FLOOR - 58.0), BLOOM.PEACH, 28, 430.0, Vector2(boss_facing, -0.15))
 			boss_time = 0.0
 			boss_target_x = clampf(x - boss_facing * 48.0, ARENA_LEFT, ARENA_RIGHT)
 			combat_sounds.stop("silk_charge")
@@ -425,6 +502,11 @@ func update_boss(delta: float) -> void:
 	elif boss_state == "blossom_cast":
 		if not cast_released and boss_time >= BLOSSOM_RELEASE_TIME:
 			cast_released = true
+			combat_sounds.play("petal_gust")
+			bloom.burst(Vector2(boss_x, FLOOR - 95.0), BLOOM.PEACH, 80, 620.0)
+			bloom.burst(Vector2(boss_x, FLOOR - 95.0), BLOOM.PEACH, 40, 280.0)
+			juice.punch(Vector2(boss_x, FLOOR - 95.0), 0.9)
+			cotton.scatter(Vector2(boss_x, FLOOR - 150.0), 6, Vector2(260, 110), 62.0, cotton.BLOSSOM)
 			wind_time = BLOSSOM_GUST_DURATION
 			wind_clock = 0.0
 			rain_clock = 0.0
@@ -452,6 +534,7 @@ func update_boss(delta: float) -> void:
 		boss_x = lerpf(boss_takeoff_x, boss_takeoff_x - boss_facing * 36.0, rise)
 		if rise >= 1.0:
 			boss_state = "leap_dive"
+			combat_sounds.play("boss_lunge")
 			boss_time = 0.0
 			boss_takeoff_x = boss_x
 			boss_target_x = clampf(x - boss_facing * 52.0, 52.0, 908.0)
@@ -460,6 +543,10 @@ func update_boss(delta: float) -> void:
 		boss_air_y = -76.0 * pow(1.0 - dive, 2.0)
 		boss_x = lerpf(boss_takeoff_x, boss_target_x, dive)
 		if dive >= 1.0:
+			combat_sounds.play("boss_slam")
+			bloom.burst(Vector2(boss_x, FLOOR - 6.0), BLOOM.PEACH, 46, 480.0, Vector2.UP)
+			juice.punch(Vector2(boss_x, FLOOR - 20.0), 0.9)
+			cotton.scatter(Vector2(boss_x, FLOOR - 40.0), 4, Vector2(200, 40), 54.0, cotton.BLOSSOM)
 			boss_air_y = 0.0
 			boss_state = "recover"
 			boss_time = 0.0
@@ -513,13 +600,39 @@ func update_boss(delta: float) -> void:
 func spawn_tree_petal(x_offset: float) -> void:
 	shots.append({"x": randf_range(35.0, 390.0) + x_offset, "y": randf_range(10.0, 145.0), "vx": randf_range(130.0, 225.0), "vy": randf_range(105.0, 160.0), "angle": randf_range(0.0, TAU), "life": 5.0, "kind": "rain"})
 
+func block_hit(from_rain: bool) -> void:
+	var perfect := guard_time <= PERFECT_GUARD
+	var at := Vector2(x + facing * 32.0, y - 44.0)
+	invincible = 0.35
+	hit_stop = 0.12 if perfect else 0.06
+	guard_flash = GUARD_FLASH_TIME
+	motion.kick(Vector2(0.86, 1.1))
+	combat_sounds.play("umbrella_block")
+	hit_fx.burst(at, facing, perfect, true)
+	cotton.burst(at, 34.0 if perfect else 24.0, cotton.BLOSSOM)
+	juice.punch(at, 1.2 if perfect else 0.7)
+	if perfect and not from_rain:
+		# A perfect guard throws her off balance and leaves an opening.
+		boss_state = "recover"
+		boss_time = 0.0
+		recovery_duration = 0.7
+		boss_air_y = 0.0
+	elif not perfect:
+		knockback_velocity = (-1.0 if x <= boss_x else 1.0) * 150.0
+		knockback_time = 0.1
+
 func damage_player(from_rain: bool) -> void:
 	if phase == "battle" and battle_elapsed < OPENING_GRACE:
 		return
 	if invincible > 0.0:
 		return
+	if guarding and (from_rain or (boss_x - x) * facing > 0.0):
+		block_hit(from_rain)
+		return
 	if not from_rain:
 		hp -= 1
+		motion.flinch()
+		juice.punch(Vector2(x, y - 32.0), 0.7)
 		var away := -1.0 if x <= boss_x else 1.0
 		knockback_velocity = away * HURT_KNOCKBACK_SPEED
 		knockback_time = HURT_KNOCKBACK_TIME
@@ -532,11 +645,30 @@ func damage_player(from_rain: bool) -> void:
 		phase = "failed"
 		shots.clear()
 
+func draw_boss_silhouette(canvas: CanvasItem) -> void:
+	if boss_silhouette.is_empty():
+		return
+	canvas.draw_set_transform(boss_silhouette[0], 0.0, boss_silhouette[1])
+	canvas.draw_texture_rect(boss_silhouette[2], boss_silhouette[3], false)
+
+# Glowing combat effects, drawn on the additive layer above the scene.
+func draw_fx(canvas: CanvasItem) -> void:
+	if phase == "battle":
+		for s in shots:
+			FX_LAYER.glow(canvas, Vector2(s.x, s.y), 20.0, Color(1.0, 0.55, 0.75, 0.7))
+		if boss_state in ["branch_prepare", "counter_prepare", "blossom_cast", "leap_rise"]:
+			var pulse := 0.75 + 0.25 * sin(flower_bob * 22.0)
+			FX_LAYER.glow(canvas, Vector2(boss_x, FLOOR - 80.0 + boss_air_y), 100.0 * pulse, Color(1.0, 0.5, 0.72, 0.7))
+	bloom.draw(canvas)
+	hit_fx.draw(canvas)
+
 func label(text: String, at: Vector2, size := 16, color := Color("e8e5ea")) -> void:
 	draw_string(FONT, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, color)
 
 func _draw() -> void:
 	weather.draw(self)
+	if juice.dim() > 0.0 and not reduce_shake:
+		draw_rect(Rect2(-60, -60, 1080, 660), Color(0.05, 0.02, 0.13, juice.dim()))
 	var boss_index := 0
 	if boss_state in ["branch_prepare", "counter_prepare", "parry"]:
 		boss_index = 1
@@ -557,9 +689,17 @@ func _draw() -> void:
 	# The striking body sits right of its long branch in the source image.
 	# Offset that pose so her feet stay planted as the branch reaches forward.
 	var pose_shift := 14.0 if boss_index == 2 else (21.0 if boss_index == 3 else (13.0 if boss_index == 4 else (8.0 if boss_index == 5 else 0.0)))
-	draw_set_transform(Vector2(roundf(boss_x), 0), 0.0, Vector2(-boss_facing, 1))
-	draw_texture_rect(boss_tex, Rect2(roundf(-boss_w / 2 - pose_shift), boss_top, boss_w, boss_h), false)
+	# A struck boss is shoved back a few pixels while she flashes.
+	# She also turns solid red and shudders, then settles.
+	var hurt := clampf(boss_flash / BOSS_FLASH_TIME, 0.0, 1.0)
+	var boss_origin := Vector2(roundf(boss_x + facing * 14.0 * hurt + sin(juice.clock * 120.0) * 8.0 * hurt), roundf(cos(juice.clock * 93.0) * 3.0 * hurt))
+	var boss_rect := Rect2(roundf(-boss_w / 2 - pose_shift), boss_top, boss_w, boss_h)
+	draw_set_transform(boss_origin, 0.0, Vector2(-boss_facing, 1))
+	draw_texture_rect(boss_tex, boss_rect, false)
 	draw_set_transform(Vector2.ZERO)
+	# The red silhouette is redrawn over her on its own layer: full red at first, then fading.
+	boss_silhouette = [boss_origin, Vector2(-boss_facing, 1), boss_tex, boss_rect]
+	boss_flash_layer.flash(Color(1.0, 0.1, 0.08), minf(1.0, hurt * 1.8) * 0.92)
 	if boss_state in ["branch_prepare", "counter_prepare"] and warning_played:
 		var branch_tip := Vector2(roundf(boss_x - boss_facing * 46.0), roundf(FLOOR - 135.0 + boss_air_y))
 		draw_circle(branch_tip, 10.0, Color(1.0, 0.86, 0.62, 0.32))
@@ -587,25 +727,48 @@ func _draw() -> void:
 	var tex := girl[pose]
 	var foot := Vector2(roundf(x), roundf(y))
 	walk.draw_shadow(self, foot, FLOOR)
+	for ghost in motion.ghosts:
+		# Fading afterimages trail behind a dash.
+		var ghost_size := girl[3].get_size()
+		draw_set_transform(ghost.foot, 0.0, Vector2(ghost.facing, 1))
+		draw_texture_rect(girl[3], Rect2(Vector2(-floorf(ghost_size.x / 2), -ghost_size.y), ghost_size), false, motion.ghost_color(ghost))
+	draw_set_transform(Vector2.ZERO)
 	if invincible <= 0.0 or int(invincible * 12) % 2 == 0:
 		# Mirror body and weapon together around the same foot anchor.
-		draw_set_transform(foot, 0.0, Vector2(facing, 1))
+		draw_set_transform(foot, motion.lean() * facing, Vector2(facing * motion.squash.x, motion.squash.y))
 		if pose == 0 and walk.walking:
-			walk.draw_body(self, girl[0])
+			walk.draw_body(self, girl[0], motion.tint(Color.WHITE))
 		else:
 			var size := tex.get_size()
-			draw_texture_rect(tex, Rect2(Vector2(-floorf(size.x / 2), -size.y), size), false)
+			draw_texture_rect(tex, Rect2(Vector2(-floorf(size.x / 2), -size.y), size), false, motion.tint(Color.WHITE))
 		var grip := Vector2(21, -38) if attack_time > 0 else Vector2(-2, -24)
 		var angle := -0.08 if attack_time > 0 else 0.38
-		draw_set_transform(foot + Vector2(grip.x * facing, grip.y), angle * facing, Vector2(facing, 1))
-		draw_texture_rect(umbrella, Rect2(-9, -4, 60, 11), false)
+		if guarding:
+			# Open canopy held out in front; it pops open and flashes when it stops a hit.
+			draw_set_transform(Vector2.ZERO)
+			draw_line(foot + Vector2(facing * 4, -34), foot + Vector2(facing * 22, -40), Color("765338"), 3)
+			draw_set_transform(foot + Vector2(facing * 22, -40), facing * PI / 2, Vector2(maxf(0.15, minf(1.0, guard_time / 0.08)), 1))
+			var shine := 1.0 + 1.4 * guard_flash / GUARD_FLASH_TIME
+			draw_texture_rect(CANOPY, Rect2(-42, -10, 84, 30), false, Color(shine, shine, shine))
+		else:
+			draw_set_transform(foot + Vector2(grip.x * facing, grip.y), angle * facing, Vector2(facing, 1))
+			draw_texture_rect(umbrella, Rect2(-9, -4, 60, 11), false)
 		draw_set_transform(Vector2.ZERO)
+	cotton.draw(self)
+	for popup in popups:
+		# Damage numbers pop up large, then float upward and fade.
+		var floated: float = popup.age / POPUP_TIME
+		var popup_at: Vector2 = popup.at + Vector2(0, -46.0 * (1.0 - pow(1.0 - floated, 2.0)))
+		var popup_size: int = 34 if popup.age < 0.08 else 26
+		label(popup.text, popup_at + Vector2(2, 2), popup_size, Color(0.15, 0.02, 0.05, 1.0 - floated))
+		label(popup.text, popup_at, popup_size, Color(1.0, 0.32, 0.26, 1.0 - floated * floated))
+	fx_layer.visible = not paused
 	label("CHAPTER 2 · PEACH BLOSSOM RAIN", Vector2(28, 35), 17)
 	label("HEALTH  " + "●".repeat(hp) + "○".repeat(6 - hp), Vector2(28, 61), 16, Color("eec9aa"))
 	if phase == "battle":
 		label("Peach Spirit's Grief", Vector2(430, 34), 16)
 		draw_rect(Rect2(350, 44, 260, 8), Color("384055"))
-		draw_rect(Rect2(350, 44, 260.0 * grief / MAX_GRIEF, 8), Color("d89bb8"))
+		draw_rect(Rect2(350, 44, 260.0 * grief / MAX_GRIEF, 8), Color("d89bb8").lerp(Color(1.0, 0.25, 0.2), clampf(boss_flash / BOSS_FLASH_TIME, 0.0, 1.0)))
 	if phase == "failed":
 		label("Petals cover the path... Press R to retry", Vector2(270, 270), 22)
 	if freeze_time > 0.0 and phase == "battle":

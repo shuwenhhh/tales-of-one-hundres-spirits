@@ -57,6 +57,32 @@ var reduce_shake := false
 var swing_audio: AudioStreamPlayer
 var hit_audio: AudioStreamPlayer
 var combat_sounds = preload("res://scripts/combat_sounds.gd").new()
+var battle_bgm = preload("res://scripts/bgm.gd").new()
+var hit_fx = preload("res://scripts/hit_spark.gd").new()
+const BLOOM := preload("res://scripts/bloom_burst.gd")
+var bloom = BLOOM.new()
+const FX_LAYER := preload("res://scripts/fx_layer.gd")
+var fx_layer = FX_LAYER.new()
+var juice = preload("res://scripts/impact_juice.gd").new()
+var cotton = preload("res://scripts/cotton_burst.gd").new()
+# Holding L / S / Down opens the umbrella as a shield against hits from the
+# front or above. Opening it just before the hit lands is a perfect guard.
+const CANOPY := preload("res://assets/chapter0/encounter/sky_canopy.png")
+const PERFECT_GUARD := 0.2
+const GUARD_FLASH_TIME := 0.2
+const BOSS_HURT_TIME := 0.42
+var guarding := false
+var guard_time := 0.0
+var guard_flash := 0.0
+var boss_hurt := 0.0
+var motion = preload("res://scripts/actor_motion.gd").new()
+var boss_flash_layer = preload("res://scripts/flash_layer.gd").new()
+var boss_silhouette: Array = []
+# Floating damage numbers: {"at": Vector2, "text": String, "age": float}
+const POPUP_TIME := 0.7
+var popups: Array[Dictionary] = []
+const SCREEN_FLASH_TIME := 0.1
+var screen_flash := 0.0
 var recovery_hit = false
 var hit_feedback = 0.0
 var boss_state = "rest"
@@ -109,6 +135,11 @@ func _ready():
 	walk.setup_audio(self)
 	background = pixel_texture("res://assets/chapter1/backgrounds/rain_town_pixel_v1.png")
 	combat_sounds.setup(self)
+	battle_bgm.setup(self, "res://assets/audio/music/silk_battle.mp3", -8.0)
+	boss_flash_layer.painter = draw_boss_silhouette
+	add_child(boss_flash_layer)
+	fx_layer.painter = draw_fx
+	add_child(fx_layer)
 	dialogue_box.mount(self)
 	swing_audio = combat_sounds.players["umbrella_swing"]
 	hit_audio = combat_sounds.players["umbrella_hit"]
@@ -185,6 +216,8 @@ func _unhandled_key_input(event):
 		begin_attack()
 
 func begin_attack(upward: bool = false):
+	if guarding:
+		return
 	if equipped and phase in ["battle", "explore", "peace"] and (hit_stop > 0 or (attack_cd > 0 and attack_cd < 0.16)):
 		buffered_attack = maxf(0.18, attack_cd + 0.04)
 		buffered_up = upward or Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP)
@@ -296,6 +329,11 @@ func unlock_memory():
 
 func retry():
 	combat_sounds.stop_all()
+	hit_fx.clear()
+	bloom.clear()
+	cotton.clear()
+	motion.clear()
+	juice.clear()
 	met_granny = true
 	granny_stood = true
 	player = Vector2(550, FLOOR_Y)
@@ -329,6 +367,23 @@ func retry():
 
 func _process(delta: float) -> void:
 	weather.advance(delta)
+	battle_bgm.update(phase == "battle", delta, paused or memory_open)
+	if not paused and not memory_open:
+		hit_fx.advance(delta)
+		bloom.advance(delta)
+		cotton.advance(delta)
+		juice.advance(delta)
+		screen_flash = maxf(0.0, screen_flash - delta)
+		guard_flash = maxf(0.0, guard_flash - delta)
+		boss_hurt = maxf(0.0, boss_hurt - delta)
+		for i in range(popups.size() - 1, -1, -1):
+			popups[i].age += delta
+			if popups[i].age >= POPUP_TIME:
+				popups.remove_at(i)
+		var moved: String = motion.advance(delta, player.round(), facing, player.y < FLOOR_Y - 1, dash > 0)
+		if moved != "":
+			cotton.dust(Vector2(player.x, FLOOR_Y), -facing if moved == "dash" else 0.0)
+	juice.apply(self, reduce_shake)
 	queue_redraw()
 	dialogue_box.visible = phase == "dialogue" and not paused and not memory_open
 	if dialogue_box.visible and dialogue_box.advance_time(delta, Input.is_physical_key_pressed(KEY_CTRL)):
@@ -374,11 +429,26 @@ func _physics_process(dt):
 	if attack > 0 and attack <= 0.28 and not swing_played:
 		swing_played = true
 		combat_sounds.play("umbrella_swing")
+		hit_fx.swing(player + Vector2(attack_facing * 14, -40), attack_facing, attack_up, motion.swings)
+		motion.swings += 1
+		motion.kick(Vector2(0.9, 1.14) if attack_up else Vector2(1.16, 0.9))
 	if buffered_attack > 0 and attack_cd <= 0:
 		buffered_attack = 0
 		begin_attack(buffered_up)
 		previous_attack = attack
 	var axis = float(Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT)) - float(Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT))
+	var wants_guard: bool = equipped and phase in ["battle", "explore", "peace"] and player.y >= FLOOR_Y - 1 and attack <= 0 and dash <= 0 and (
+		Input.is_physical_key_pressed(KEY_L) or Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN))
+	if wants_guard and not guarding:
+		guard_time = 0.0
+		motion.kick(Vector2(1.12, 0.88))
+		combat_sounds.play("umbrella_open")
+	guarding = wants_guard
+	if guarding:
+		guard_time += dt
+		if axis != 0:
+			facing = int(axis)
+		axis = 0.0
 	moving = axis != 0
 	if dash > 0:
 		player.x += facing * 490 * dt
@@ -484,6 +554,7 @@ func update_boss(dt):
 					var origin: Vector2 = boss + Vector2(boss_direction * 55, -78)
 					var direction: Vector2 = (silk_aim - origin).normalized().rotated(offset)
 					spawn_silk(origin, direction * 230, 38.0)
+					bloom.burst(origin, BLOOM.SILK, 8, 300.0, direction)
 				enter_boss_state("release")
 		"cast":
 			if boss_time >= 0.85:
@@ -493,6 +564,7 @@ func update_boss(dt):
 			while volley_shots < 3 and boss_time >= volley_shots * 0.85:
 				combat_sounds.play("silk_shot")
 				spawn_silk(boss + Vector2(boss_direction * 55, -34), Vector2(boss_direction * 260, 0), 42.0)
+				bloom.burst(boss + Vector2(boss_direction * 55, -34), BLOOM.SILK, 14, 320.0, Vector2(boss_direction, 0))
 				volley_shots += 1
 			if boss_time >= 1.95:
 				enter_boss_state("release")
@@ -510,6 +582,12 @@ func update_boss(dt):
 		"air_charge":
 			if boss_time >= 1.0:
 				combat_sounds.play("silk_burst")
+				bloom.burst(boss + Vector2(0, -55), BLOOM.SILK, 56, 520.0)
+				bloom.burst(boss + Vector2(0, -55), BLOOM.SILK, 24, 240.0)
+				juice.punch(boss + Vector2(0, -55), 0.8, false)
+				cotton.scatter(boss + Vector2(0, -55), 5, Vector2(230, 90), 62.0)
+				screen_flash = SCREEN_FLASH_TIME
+				shake_time = 0.18
 				for i in 8:
 					var direction = Vector2.from_angle(i * TAU / 8 + PI / 8)
 					spawn_silk(boss + Vector2(0, -55) + direction * 52, direction * 170, 44.0)
@@ -526,9 +604,15 @@ func update_boss(dt):
 			boss = boss_origin.lerp(boss_target, pow(minf(boss_time/0.45,1.0),2))
 			var near: Vector2 = Geometry2D.get_closest_point_to_segment(player + Vector2(0,-30), old + Vector2(0,-30), boss + Vector2(0,-30))
 			if near.distance_to(player + Vector2(0,-30)) < 30:
-				damage_player()
+				damage_player(old.x)
 			if boss_time >= 0.45:
 				impact_time = 0.4
+				combat_sounds.play("boss_slam")
+				bloom.burst(boss + Vector2(0, -6), BLOOM.SILK, 44, 480.0, Vector2.UP)
+				juice.punch(boss + Vector2(0, -20), 0.9, false)
+				cotton.scatter(boss + Vector2(0, -40), 5, Vector2(210, 40), 56.0)
+				screen_flash = SCREEN_FLASH_TIME
+				shake_time = 0.18
 				enter_boss_state("land")
 		"dash_prepare":
 			if boss_time >= 0.8:
@@ -539,7 +623,7 @@ func update_boss(dt):
 			boss = boss_origin.lerp(boss_target,minf(boss_time/0.65,1.0))
 			var closest = Geometry2D.get_closest_point_to_segment(player + Vector2(0,-30),old+Vector2(0,-30),boss+Vector2(0,-30))
 			if closest.distance_to(player+Vector2(0,-30)) < 30:
-				damage_player()
+				damage_player(old.x)
 			if boss_time >= 0.65:
 				enter_boss_state("land")
 		"land":
@@ -556,6 +640,13 @@ func enter_boss_state(state: String):
 	boss_origin = boss
 	if state in ["cast", "diagonal_cast", "air_charge"]:
 		combat_sounds.play("silk_charge")
+	if state in ["dash", "dive"]:
+		combat_sounds.play("boss_lunge")
+		# Silk blossoms kick out behind her as she launches.
+		var launch: Vector2 = (boss_target - boss).normalized()
+		bloom.burst(boss + Vector2(0, -40), BLOOM.SILK, 26, 380.0, -launch)
+	if state == "rise":
+		bloom.burst(boss + Vector2(0, -20), BLOOM.SILK, 20, 300.0, Vector2.DOWN)
 	if state == "volley":
 		volley_shots = 0
 	if state == "diagonal_cast":
@@ -563,11 +654,34 @@ func enter_boss_state(state: String):
 	if state in ["recover", "air_fire"]:
 		recovery_hit = false
 
-func damage_player():
+func block_hit() -> void:
+	var perfect := guard_time <= PERFECT_GUARD
+	var at: Vector2 = player + Vector2(facing * 32, -44)
+	invulnerable = 0.3
+	hit_stop = 0.12 if perfect else 0.06
+	guard_flash = GUARD_FLASH_TIME
+	motion.kick(Vector2(0.86, 1.1))
+	shake_time = 0.18
+	combat_sounds.play("umbrella_block")
+	hit_fx.burst(at, facing, perfect, true)
+	cotton.burst(at, 34.0 if perfect else 24.0)
+	juice.punch(at, 1.2 if perfect else 0.7, false)
+	if not perfect:
+		player.x = clampf(player.x - facing * 16, 30, 930)
+
+# `source_x` is where the hit came from; leave it out for an unblockable hit.
+func damage_player(source_x: float = INF, from_above: bool = false):
 	if invulnerable > 0 or phase != "battle":
+		return
+	if guarding and (from_above or (source_x != INF and (source_x - player.x) * facing > 0)):
+		block_hit()
 		return
 	hp -= 1
 	invulnerable = 1.2
+	motion.flinch()
+	shake_time = 0.18
+	bloom.burst(player + Vector2(0, -32), BLOOM.SILK, 14, 280.0)
+	juice.punch(player + Vector2(0, -32), 0.7, false)
 	if hp <= 0:
 		phase = "failed"
 		combat_sounds.stop_all()
@@ -587,7 +701,7 @@ func update_bullets(dt):
 		var closest = Geometry2D.get_closest_point_to_segment(body, tail, b.pos)
 		if closest.distance_to(body) < 19 and invulnerable <= 0:
 			bullets.remove_at(i)
-			damage_player()
+			damage_player(player.x - signf(b.velocity.x) * 10.0, b.velocity.y > absf(b.velocity.x))
 			if phase == "failed":
 				return
 		elif b.life <= 0 or b.pos.y > FLOOR_Y or b.pos.x < -30 or b.pos.x > 990 or b.pos.y < -40:
@@ -643,7 +757,10 @@ func draw_actor(tex: Texture2D, foot: Vector2, height: float, flip: bool = false
 
 func _draw():
 	var strength: float = pow(shake_time / 0.18, 2) if not reduce_shake else 0.0
-	world_offset = Vector2(sin(feedback_clock*95)*3.0,cos(feedback_clock*113)*1.7)*strength
+	world_offset = Vector2(sin(feedback_clock*95)*6.5,cos(feedback_clock*113)*4.0)*strength
+	fx_layer.position = world_offset
+	fx_layer.visible = not paused and not memory_open
+	boss_flash_layer.flash(Color.RED, 0.0)
 	world_transform(Vector2.ZERO)
 	var source_size := background.get_size()
 	var source_floor := source_size.y * BACKGROUND_ROAD_Y
@@ -652,6 +769,8 @@ func _draw():
 	draw_texture_rect_region(background, Rect2(0, 0, 960, FLOOR_Y), Rect2(0, 0, source_size.x, source_floor))
 	draw_texture_rect_region(background, Rect2(0, FLOOR_Y, 960, 540 - FLOOR_Y), Rect2(0, source_floor, source_size.x, source_size.y - source_floor))
 	weather.draw(self)
+	if juice.dim() > 0.0 and not reduce_shake:
+		draw_rect(Rect2(-60, -60, 1080, 660), Color(0.05, 0.02, 0.13, juice.dim()))
 	if granny == null or frames.is_empty():
 		return
 	spinning.draw_equipment(self)
@@ -673,20 +792,41 @@ func _draw():
 			pose = 4
 		elif boss_state == "land" or (boss_state == "recover" and boss_time < 0.5):
 			pose = 5
-	world_transform(boss + Vector2(attack_facing * 9 * recoil / 0.18, bob), -attack_facing * 0.045 * recoil/0.18, Vector2(-1 if boss_direction > 0 else 1, 1))
+	# Her body breathes with the fight: it swells while she gathers silk, flattens
+	# on landing and snaps back and thin when struck.
+	var boss_shape := Vector2.ONE
+	if phase == "battle":
+		if boss_state in ["cast", "diagonal_cast", "air_charge", "wrap", "dash_prepare", "dive_prepare"]:
+			var swell := 0.04 * sin(clock_time * 20.0)
+			boss_shape = Vector2(1.0 + swell, 1.0 - swell)
+		elif boss_state == "land" and boss_time < 0.18:
+			boss_shape = Vector2(1.22, 0.8).lerp(Vector2.ONE, boss_time / 0.18)
+		if recoil > 0:
+			boss_shape = boss_shape.lerp(Vector2(0.86, 1.12), recoil / 0.18)
+	# A struck boss turns solid red and shudders, then settles.
+	var hurt: float = clampf(boss_hurt / BOSS_HURT_TIME, 0.0, 1.0)
+	var shudder := Vector2(sin(juice.clock * 120.0) * 8.0, cos(juice.clock * 93.0) * 3.0) * hurt
+	var boss_origin_now: Vector2 = boss + Vector2(attack_facing * 18 * recoil / 0.18, bob) + shudder
+	var boss_angle: float = -attack_facing * 0.12 * recoil/0.18
+	var boss_zoom := Vector2((-1 if boss_direction > 0 else 1) * boss_shape.x, boss_shape.y)
+	world_transform(boss_origin_now, boss_angle, boss_zoom)
 	# One shared scale preserves the head size while dash/landing change the silhouette.
 	# Pixel poses are already at the shared 0.32 scale; draw 1:1 on whole pixels.
 	var size: Vector2 = boss_frames[pose].get_size()
 	var flight = flight_pose()
-	var tint = Color(1.65,1.65,1.8) if hit_stop > 0 else Color.WHITE
+	var tint = Color.WHITE
 	if show_worker:
 		tint.a = 0.0
+	var boss_texture: Texture2D = boss_frames[pose]
+	var boss_rect := Rect2(Vector2(-floorf(size.x/2),-size.y), size)
 	if not flight.is_empty():
-		var texture: Texture2D = ascent_frames[flight.index] if flight.kind == "ascent" else landing_frames[flight.index]
-		draw_texture_rect(texture, Rect2(Vector2(-128,-240),Vector2(256,300)),false,tint)
-	else:
-		draw_texture_rect(boss_frames[pose], Rect2(Vector2(-floorf(size.x/2),-size.y), size), false, tint)
+		boss_texture = ascent_frames[flight.index] if flight.kind == "ascent" else landing_frames[flight.index]
+		boss_rect = Rect2(Vector2(-128,-240),Vector2(256,300))
+	draw_texture_rect(boss_texture, boss_rect, false, tint)
 	world_transform(Vector2.ZERO)
+	# The red silhouette is redrawn over her on its own layer: full red at first, then fading.
+	boss_silhouette = [(boss_origin_now + world_offset).round(), boss_angle, boss_zoom, boss_texture, boss_rect]
+	boss_flash_layer.flash(Color(1.0, 0.1, 0.08), 0.0 if show_worker else minf(1.0, hurt * 1.8) * 0.92)
 	if phase == "battle" and boss_state in ["cast","diagonal_cast","volley"]:
 		var hand = boss + Vector2(boss_direction * 55, -34)
 		if boss_state == "diagonal_cast":
@@ -712,18 +852,28 @@ func _draw():
 	draw_hero()
 	for bullet in bullets:
 		draw_silk_bundle(bullet)
+	cotton.draw(self)
+	for popup in popups:
+		# Damage numbers pop up large, then float upward and fade.
+		var floated: float = popup.age / POPUP_TIME
+		var popup_at: Vector2 = popup.at + Vector2(0, -46.0 * (1.0 - pow(1.0 - floated, 2.0)))
+		var popup_size: int = 34 if popup.age < 0.08 else 26
+		words(popup.text, popup_at + Vector2(2, 2), popup_size, Color(0.15, 0.02, 0.05, 1.0 - floated))
+		words(popup.text, popup_at, popup_size, Color(1.0, 0.32, 0.26, 1.0 - floated * floated))
 	world_offset = Vector2.ZERO
 	world_transform(Vector2.ZERO)
+	if screen_flash > 0.0 and not reduce_shake:
+		draw_rect(Rect2(0, 0, 960, 540), Color(1, 1, 1, 0.16 * screen_flash / SCREEN_FLASH_TIME))
 	panel(Rect2(18, 16, 340, 64))
 	words("CHAPTER 1 · ENDLESS THREADS", Vector2(30, 40), 18)
 	words("HEALTH  " + "●".repeat(hp) + "○".repeat(6 - hp), Vector2(30, 65), 16, Color("d6b68a"))
 	panel(Rect2(755, 16, 187, 64))
-	words("[1] Umbrella: " + ("On" if equipped else "Off"), Vector2(770, 40))
+	words("[1] Umbrella: " + ("On" if equipped else "Off") + "  [L] Guard", Vector2(770, 40), 13)
 	words("[M] Memories  " + ("1 / 1" if memory else "0 / 1"), Vector2(770, 65))
 	if phase == "battle":
 		words("Grandmother's Grief", Vector2(420, 34), 16)
 		draw_rect(Rect2(350, 44, 260, 8), Color("273145"))
-		draw_rect(Rect2(350, 44, 260 * maxf(0, resolve) / MAX_RESOLVE, 8), Color("bfbbc8"))
+		draw_rect(Rect2(350, 44, 260 * maxf(0, resolve) / MAX_RESOLVE, 8), Color("bfbbc8").lerp(Color(1.0, 0.25, 0.2), clampf(boss_hurt / BOSS_HURT_TIME, 0.0, 1.0)))
 	if phase == "peace" and absf(player.x - boss.x) < 110:
 		words("[E] Listen", boss + Vector2(-35, -136), 16, Color("efd9a0"))
 	if phase == "failed":
@@ -871,13 +1021,28 @@ func draw_hero():
 	var lean: float = direction * extension * 0.05 if attack > 0 and not attack_up else 0.0
 	world_transform(Vector2.ZERO)
 	walk.draw_shadow(self, player, FLOOR_Y)
-	world_transform(player+body_offset, lean, Vector2(direction, 1))
+	for ghost in motion.ghosts:
+		# Fading afterimages trail behind a dash.
+		var ghost_size: Vector2 = frames[3].get_size()
+		world_transform(ghost.foot, 0.0, Vector2(ghost.facing, 1))
+		draw_texture_rect(frames[3], Rect2(Vector2(-floorf(ghost_size.x/2), -ghost_size.y), ghost_size), false, motion.ghost_color(ghost))
+	# Squash, stretch and the hurt lean are visual only; the weapon keeps its exact pose.
+	world_transform(player+body_offset, lean + motion.lean() * direction, Vector2(direction * motion.squash.x, motion.squash.y))
+	var body_tint: Color = motion.tint(tint)
 	if pose == 0 and attack <= 0 and walk.walking and moving:
-		walk.draw_body(self, frames[0], tint)
+		walk.draw_body(self, frames[0], body_tint)
 	else:
-		draw_texture_rect(frames[pose], Rect2(Vector2(-floorf(size.x/2), -size.y), size), false, tint)
+		draw_texture_rect(frames[pose], Rect2(Vector2(-floorf(size.x/2), -size.y), size), false, body_tint)
 	world_transform(Vector2.ZERO)
-	if equipped:
+	if equipped and guarding:
+		# Open canopy held out in front; it pops open and flashes when it stops a hit.
+		var hub: Vector2 = player + Vector2(facing * 22, -40)
+		draw_line(player + Vector2(facing * 4, -34), hub, Color("765338"), 3)
+		world_transform(hub, facing * PI / 2, Vector2(maxf(0.15, minf(1.0, guard_time / 0.08)), 1))
+		var shine := 1.0 + 1.4 * guard_flash / GUARD_FLASH_TIME
+		draw_texture_rect(CANOPY, Rect2(-42, -10, 84, 30), false, Color(shine, shine, shine, tint.a))
+		world_transform(Vector2.ZERO)
+	elif equipped:
 		var walking_pose: bool = pose == 0 and attack <= 0 and walk.walking and moving
 		var grip: Vector2 = walk.carry_grip() if walking_pose else Vector2(-2,-24)
 		var angle := 0.18 if walking_pose else 0.38
@@ -908,16 +1073,23 @@ func draw_hero():
 			for i in 3:
 				var side := aim.orthogonal() * (i-1)*3
 				draw_line(pivot+aim*25+side,pivot+aim*47+side,Color(0.6,0.94,1,0.45),1.1,true)
-	if hit_feedback > 0:
-		var t: float = 1.0 - hit_feedback/0.35
-		if t < 0.22:
-			draw_line(hit_position-Vector2(10,0),hit_position+Vector2(10,0),Color(0.9,1,1),3,true)
-			draw_line(hit_position-Vector2(0,7),hit_position+Vector2(0,7),Color(0.9,1,1),2,true)
-		for i in 7:
-			var ray := Vector2.from_angle(i*TAU/7)
-			var point: Vector2 = hit_position + ray * (5 + t*19)
-			draw_line(point,point+ray*4,Color(0.65,0.98,1,1-t),1.6,true)
-			draw_circle(point+ray*4,1.3,Color(0.7,1,1,1-t),true,-1,true)
+
+func draw_boss_silhouette(canvas: CanvasItem) -> void:
+	if boss_silhouette.is_empty():
+		return
+	canvas.draw_set_transform(boss_silhouette[0], boss_silhouette[1], boss_silhouette[2])
+	canvas.draw_texture_rect(boss_silhouette[3], boss_silhouette[4], false)
+
+# Glowing combat effects, drawn on the additive layer above the scene.
+func draw_fx(canvas: CanvasItem) -> void:
+	if phase == "battle":
+		for bullet in bullets:
+			FX_LAYER.glow(canvas, bullet.pos, 20.0, Color(0.75, 0.88, 1.0, 0.75))
+		if boss_state in ["cast", "diagonal_cast", "volley", "air_charge", "wrap", "dash_prepare", "dive_prepare"]:
+			var pulse := 0.75 + 0.25 * sin(clock_time * 22.0)
+			FX_LAYER.glow(canvas, boss + Vector2(0, -62), 95.0 * pulse, Color(0.7, 0.82, 1.0, 0.7))
+	bloom.draw(canvas)
+	hit_fx.draw(canvas)
 
 
 
@@ -937,10 +1109,21 @@ func extension_at(remaining: float) -> float:
 	return 1.0-smoothstep(0.18,0.34,elapsed)
 
 func trigger_impact():
+	var final_blow: bool = resolve <= 0
 	hit_feedback = 0.35
-	hit_stop = 0.065
+	hit_stop = 0.22 if final_blow else 0.083
 	recoil = 0.18
+	boss_hurt = BOSS_HURT_TIME
+	popups.append({"at": boss + Vector2(randf_range(-18.0, 18.0), -128.0), "text": "-1", "age": 0.0})
+	juice.punch(hit_position, 1.6 if final_blow else 1.0, false)
+	# Every blow knocks cotton out of her: one puff at the contact point, more off her body.
+	cotton.burst(hit_position + Vector2(attack_facing * 10, 0), 58.0 if final_blow else 34.0)
+	cotton.scatter(boss + Vector2(attack_facing * 20, -62), 6 if final_blow else 2, Vector2(46, 44), 24.0)
 	shake_time = 0.18
+	hit_fx.burst(hit_position, attack_facing, resolve <= 0)
+	# Shreds of silk fly off her with every landed strike.
+	bloom.burst(hit_position, BLOOM.SILK, 26 if resolve <= 0 else 12, 360.0, Vector2(attack_facing, -0.45))
+	screen_flash = SCREEN_FLASH_TIME
 	combat_sounds.play("umbrella_hit")
 
 func world_transform(origin: Vector2, angle: float = 0.0, zoom: Vector2 = Vector2.ONE):

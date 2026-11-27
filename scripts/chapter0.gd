@@ -49,8 +49,20 @@ var missed := false
 var impact := Vector2.ZERO
 var walk := preload("res://scripts/hero_walk.gd").new()
 var dialogue := preload("res://scripts/dialogue_box.gd").new()
+var rain_bgm := preload("res://scripts/bgm.gd").new()
+var catch_audio := AudioStreamPlayer.new()
+var miss_audio := AudioStreamPlayer.new()
+# Each caught drop steps up a D pentatonic scale, in key with the rain music.
+const CATCH_PITCH := [1.0, 1.125, 1.25, 1.5, 1.667, 2.0, 2.25, 2.5, 3.0, 3.333]
 
 func _ready() -> void:
+	rain_bgm.setup(self, "res://assets/audio/music/rain_catch.mp3", -22.0)
+	for sound: AudioStreamPlayer in [catch_audio, miss_audio]:
+		add_child(sound)
+	catch_audio.stream = load("res://assets/audio/rain/drop_catch.wav")
+	catch_audio.volume_db = -4.0
+	miss_audio.stream = load("res://assets/audio/rain/drop_miss.wav")
+	miss_audio.volume_db = -8.0
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	JOURNEY.remember_chapter(scene_file_path)
 	JOURNEY.apply_preferences()
@@ -138,10 +150,13 @@ func advance_rain(delta: float) -> void:
 	var dx := absf(pos.x - x)
 	var roof_y := FLOOR_Y - 87 + 19 * dx / 36
 	if dx <= 36 and previous.y <= roof_y and pos.y >= roof_y:
+		catch_audio.pitch_scale = CATCH_PITCH[caught % CATCH_PITCH.size()]
+		catch_audio.play()
 		caught += 1
 		missed = false
 		impact = Vector2(pos.x, roof_y)
 	elif pos.y >= FLOOR_Y:
+		miss_audio.play()
 		missed = true
 		caught = 0
 		impact = Vector2(pos.x, FLOOR_Y)
@@ -151,6 +166,7 @@ func advance_rain(delta: float) -> void:
 
 func _process(delta: float) -> void:
 	elapsed += delta
+	rain_bgm.update(phase >= Phase.UNFURL and not leaving, delta)
 	if phase == Phase.OPENING and elapsed >= 0.30:
 		phase = Phase.JUMPING
 		elapsed = 0

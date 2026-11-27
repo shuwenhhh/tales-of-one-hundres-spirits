@@ -226,7 +226,7 @@ func _show_settings() -> void:
 			JOURNEY.set_preference(key, enabled)
 			JOURNEY.apply_preferences())
 		modal_content.add_child(toggle)
-	_modal_text("A / D or arrows: Move    Space: Jump\nJ: Umbrella strike / reflect foxfire (Chapter Three)\nW / Up + J: Upward strike (Chapter One)\nShift / K: Dodge    E: Listen    Ctrl: Fast-forward dialogue\n1: Equip umbrella / M: Memories (Chapter One)\nEsc: Pause    Q while paused: Main menu\n\nContinue Journey starts after your furthest completed chapter. Read stories or replay cleared chapters in Memories. Chapter Three dialogue is currently Chinese.")
+	_modal_text("A / D or arrows: Move    Space: Jump\nJ: Umbrella strike / reflect foxfire (Chapter Three)\nW / Up + J: Upward strike (Chapter One)\nShift / K: Dodge    L / S: Guard with the open umbrella    E: Listen    Ctrl: Fast-forward dialogue\n1: Equip umbrella / M: Memories (Chapter One)\nEsc: Pause    Q while paused: Main menu\n\nContinue Journey starts after your furthest completed chapter. Read stories or replay cleared chapters in Memories. Chapter Three dialogue is currently Chinese.")
 	_add_close()
 
 func _begin_story() -> void:
